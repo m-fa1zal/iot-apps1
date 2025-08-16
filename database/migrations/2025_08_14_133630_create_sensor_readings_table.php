@@ -14,12 +14,16 @@ return new class extends Migration
         Schema::create('sensor_readings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('device_id')->constrained()->onDelete('cascade');
-            $table->decimal('distance', 8, 2)->comment('Distance in cm');
-            $table->integer('boot_count')->unsigned()->default(0);
+            $table->decimal('temperature', 5, 2)->nullable()->comment('Temperature in Celsius from DHT11');
+            $table->decimal('humidity', 5, 2)->nullable()->comment('Humidity percentage from DHT11');
+            $table->integer('rssi')->nullable()->comment('RSSI value for LoRa signal strength in dBm');
+            $table->decimal('battery_voltage', 4, 2)->nullable()->comment('Battery voltage in volts');
+            $table->timestamp('reading_time')->comment('Time when ESP32 captured the reading');
             $table->boolean('web_triggered')->default(false)->comment('Manual vs scheduled reading');
             $table->timestamps();
             
             $table->index(['device_id', 'created_at']);
+            $table->index(['device_id', 'reading_time']);
         });
     }
 

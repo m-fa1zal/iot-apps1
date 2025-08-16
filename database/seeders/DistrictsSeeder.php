@@ -15,39 +15,39 @@ class DistrictsSeeder extends Seeder
     {
         $districts = [
             // Johor (state_id: 1)
-            ['state_code' => 'JHR', 'name' => 'Johor Bahru'],
-            ['state_code' => 'JHR', 'name' => 'Batu Pahat'],
-            ['state_code' => 'JHR', 'name' => 'Muar'],
-            ['state_code' => 'JHR', 'name' => 'Pontian'],
-            ['state_code' => 'JHR', 'name' => 'Kulai'],
-            ['state_code' => 'JHR', 'name' => 'Kluang'],
-            ['state_code' => 'JHR', 'name' => 'Segamat'],
-            ['state_code' => 'JHR', 'name' => 'Mersing'],
-            ['state_code' => 'JHR', 'name' => 'Kota Tinggi'],
-            ['state_code' => 'JHR', 'name' => 'Tangkak'],
+            ['state_code' => 'JHR', 'name' => 'Johor Bahru', 'district_code' => 'JHR01'],
+            ['state_code' => 'JHR', 'name' => 'Batu Pahat', 'district_code' => 'JHR02'],
+            ['state_code' => 'JHR', 'name' => 'Muar', 'district_code' => 'JHR03'],
+            ['state_code' => 'JHR', 'name' => 'Pontian', 'district_code' => 'JHR04'],
+            ['state_code' => 'JHR', 'name' => 'Kulai', 'district_code' => 'JHR05'],
+            ['state_code' => 'JHR', 'name' => 'Kluang', 'district_code' => 'JHR06'],
+            ['state_code' => 'JHR', 'name' => 'Segamat', 'district_code' => 'JHR07'],
+            ['state_code' => 'JHR', 'name' => 'Mersing', 'district_code' => 'JHR08'],
+            ['state_code' => 'JHR', 'name' => 'Kota Tinggi', 'district_code' => 'JHR09'],
+            ['state_code' => 'JHR', 'name' => 'Tangkak', 'district_code' => 'JHR10'],
 
             // Kedah (state_id: 2)
-            ['state_code' => 'KDH', 'name' => 'Alor Setar'],
-            ['state_code' => 'KDH', 'name' => 'Sungai Petani'],
-            ['state_code' => 'KDH', 'name' => 'Kulim'],
-            ['state_code' => 'KDH', 'name' => 'Langkawi'],
-            ['state_code' => 'KDH', 'name' => 'Kuala Kedah'],
-            ['state_code' => 'KDH', 'name' => 'Pendang'],
-            ['state_code' => 'KDH', 'name' => 'Padang Terap'],
-            ['state_code' => 'KDH', 'name' => 'Pokok Sena'],
-            ['state_code' => 'KDH', 'name' => 'Kubang Pasu'],
-            ['state_code' => 'KDH', 'name' => 'Kota Setar'],
-            ['state_code' => 'KDH', 'name' => 'Bandar Baharu'],
-            ['state_code' => 'KDH', 'name' => 'Baling'],
+            ['state_code' => 'KDH', 'name' => 'Alor Setar', 'district_code' => 'KDH01'],
+            ['state_code' => 'KDH', 'name' => 'Sungai Petani', 'district_code' => 'KDH02'],
+            ['state_code' => 'KDH', 'name' => 'Kulim', 'district_code' => 'KDH03'],
+            ['state_code' => 'KDH', 'name' => 'Langkawi', 'district_code' => 'KDH04'],
+            ['state_code' => 'KDH', 'name' => 'Kuala Kedah', 'district_code' => 'KDH05'],
+            ['state_code' => 'KDH', 'name' => 'Pendang', 'district_code' => 'KDH06'],
+            ['state_code' => 'KDH', 'name' => 'Padang Terap', 'district_code' => 'KDH07'],
+            ['state_code' => 'KDH', 'name' => 'Pokok Sena', 'district_code' => 'KDH08'],
+            ['state_code' => 'KDH', 'name' => 'Kubang Pasu', 'district_code' => 'KDH09'],
+            ['state_code' => 'KDH', 'name' => 'Kota Setar', 'district_code' => 'KDH10'],
+            ['state_code' => 'KDH', 'name' => 'Bandar Baharu', 'district_code' => 'KDH11'],
+            ['state_code' => 'KDH', 'name' => 'Baling', 'district_code' => 'KDH12'],
 
             // Kelantan (state_id: 3)
-            ['state_code' => 'KTN', 'name' => 'Kota Bharu'],
-            ['state_code' => 'KTN', 'name' => 'Tumpat'],
-            ['state_code' => 'KTN', 'name' => 'Pasir Mas'],
-            ['state_code' => 'KTN', 'name' => 'Tanah Merah'],
-            ['state_code' => 'KTN', 'name' => 'Machang'],
-            ['state_code' => 'KTN', 'name' => 'Kuala Krai'],
-            ['state_code' => 'KTN', 'name' => 'Gua Musang'],
+            ['state_code' => 'KTN', 'name' => 'Kota Bharu', 'district_code' => 'KTN01'],
+            ['state_code' => 'KTN', 'name' => 'Tumpat', 'district_code' => 'KTN02'],
+            ['state_code' => 'KTN', 'name' => 'Pasir Mas', 'district_code' => 'KTN03'],
+            ['state_code' => 'KTN', 'name' => 'Tanah Merah', 'district_code' => 'KTN04'],
+            ['state_code' => 'KTN', 'name' => 'Machang', 'district_code' => 'KTN05'],
+            ['state_code' => 'KTN', 'name' => 'Kuala Krai', 'district_code' => 'KTN06'],
+            ['state_code' => 'KTN', 'name' => 'Gua Musang', 'district_code' => 'KTN07'],
             ['state_code' => 'KTN', 'name' => 'Bachok'],
             ['state_code' => 'KTN', 'name' => 'Pasir Puteh'],
             ['state_code' => 'KTN', 'name' => 'Jeli'],
@@ -192,7 +192,7 @@ class DistrictsSeeder extends Seeder
         ];
 
         foreach ($districts as $district) {
-            $state = DB::table('states')->where('code', $district['state_code'])->first();
+            $state = DB::table('states')->where('state_code', $district['state_code'])->first();
             
             if ($state) {
                 DB::table('districts')->updateOrInsert(
@@ -200,6 +200,7 @@ class DistrictsSeeder extends Seeder
                     [
                         'state_id' => $state->id,
                         'name' => $district['name'],
+                        'district_code' => $district['district_code'] ?? null,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]

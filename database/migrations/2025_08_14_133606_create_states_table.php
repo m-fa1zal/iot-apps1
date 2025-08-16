@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('states', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('code', 10);
+            $table->string('state_code', 10);
             $table->timestamps();
         });
     }

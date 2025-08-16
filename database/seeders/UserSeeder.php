@@ -21,7 +21,7 @@ class UserSeeder extends Seeder
                 'name' => 'Admin User',
                 'email' => 'admin@iot-apps.local',
                 'password' => Hash::make('password123'),
-                'telegram_chat_id' => null,
+                'role' => 'admin',
                 'email_verified_at' => now(),
             ]
         );
@@ -33,7 +33,7 @@ class UserSeeder extends Seeder
                 'name' => 'Test User',
                 'email' => 'test@iot-apps.local',
                 'password' => Hash::make('password123'),
-                'telegram_chat_id' => '123456789',
+                'role' => 'user',
                 'email_verified_at' => now(),
             ]
         );
@@ -45,14 +45,14 @@ class UserSeeder extends Seeder
                 'name' => 'Demo User',
                 'email' => 'demo@iot-apps.local',
                 'password' => Hash::make('password123'),
-                'telegram_chat_id' => '987654321',
+                'role' => 'user',
                 'email_verified_at' => now(),
             ]
         );
 
         $this->command->info('Initial users created:');
-        $this->command->info('Admin: admin@iot-apps.local / password123');
-        $this->command->info('Test: test@iot-apps.local / password123');
-        $this->command->info('Demo: demo@iot-apps.local / password123');
+        $this->command->info('Admin: admin@iot-apps.local / password123 (admin role)');
+        $this->command->info('Test: test@iot-apps.local / password123 (user role)');
+        $this->command->info('Demo: demo@iot-apps.local / password123 (user role)');
     }
 }

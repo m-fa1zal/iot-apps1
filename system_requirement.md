@@ -6,9 +6,10 @@ A Laravel-based web application for managing ESP32 ultrasonic sensors with real-
 ## Technology Stack
 
 ### Backend
-- **Framework**: Laravel (latest version)
+- **Framework**: Laravel 12
 - **Database**: MySQL 8.0+
 - **Authentication**: Laravel Sanctum
+- **Excel Export**: Laravel Excel (Maatwebsite/Excel 3.1+)
 - **Timezone**: Asia/Kuala_Lumpur (Malaysia/Singapore)
 
 ### Frontend
@@ -35,49 +36,51 @@ A Laravel-based web application for managing ESP32 ultrasonic sensors with real-
 - User CRUD operations with role management ✅
 - Navigation security (role-based menu visibility) ✅
 
-### 2. Location-Based Device Management
-- Add/edit/delete ESP32 devices with complete location details
-- Generate unique API tokens for each device
-- **Location Structure**:
-  - State (Malaysian states dropdown)
-  - District (Cascading dropdown based on selected state)
-  - Address (Free text field for specific location)
-- Device status tracking (online/offline)
-- Last seen timestamp for each device
-- Location-based device filtering and grouping
+### 2. Location-Based Device Management ✅ COMPLETED
+- **Full Device CRUD Operations**: Create, read, update, and delete IoT devices ✅
+- **Station Management**: Complete station information management with unique station IDs ✅
+- **Location Structure**: ✅
+  - State (Malaysian states dropdown with 16 states) ✅
+  - District (Cascading dropdown based on selected state, 190+ districts) ✅
+  - Address (Free text field for specific location) ✅
+  - GPS Coordinates (Latitude/Longitude for Google Maps integration) ✅
+- **Device Configuration**: ✅
+  - MAC Address management ✅
+  - Data collection intervals (customizable minutes) ✅
+  - API token generation (secure 64-character tokens) ✅
+- **Device Status Tracking**: Enhanced status system (online/offline/maintenance) ✅
+- **Station Activity**: Soft deletion with station_active boolean flag ✅
+- **Historical Data Management**: Complete sensor readings with Excel export ✅
 
-### 3. Web Dashboard with Location Features ✅ PARTIALLY COMPLETED
+### 3. Real-time IoT Monitoring Dashboard ✅ COMPLETED
 
-#### Main Dashboard ✅ COMPLETED
-- **Modern Dark Navigation**: Dark blue gradient navigation bar ✅
-- **Light Content Area**: Clean, professional light theme for main content ✅
-- **Statistics Cards**: Centered 3-card layout showing device metrics ✅
-  - Total Devices with purple gradient icon ✅
-  - Online Devices with green gradient icon ✅
-  - Offline Devices with orange gradient icon ✅
-- **Responsive Design**: Balanced layout across all screen sizes ✅
-- **Role-based Access**: Different dashboard views for Admin vs User ✅
-- **Modern UI Components**: Cards with hover effects and gradients ✅
+#### Real-time Station Monitoring ✅ COMPLETED
+- **Live Dashboard Interface**: Comprehensive real-time monitoring of all IoT stations ✅
+- **Station Cards Display**: Individual cards for each station showing current status ✅
+- **Real-time Data Updates**: Auto-refresh every 60 seconds with smart user interaction detection ✅
+- **Summary Statistics**: Total, Online, Offline, and Maintenance station counts ✅
+- **Current Sensor Readings**: Temperature, humidity, battery level, and signal strength ✅
+- **Location Filtering**: Filter stations by State and District with cascading dropdowns ✅
+- **Role-based Access Control**: Different access levels for Admin vs User roles ✅
+- **Request Data Functionality**: Manual data request from ESP32 stations with database tracking ✅
 
-#### Historical Data Tab
-- **Comprehensive Data Table** with columns:
-  - Device Name, State, District, Address
-  - Distance readings, Boot Count
-  - Timestamp (Asia/Kuala_Lumpur timezone)
-  - Web-triggered indicator
-- **Advanced Filtering**:
-  - Date range picker
-  - State/District cascading dropdowns
-  - Device name search
-- **Export Functionality**: CSV export with location data
-- **Pagination**: Efficient handling of large datasets
+#### Station Action Controls ✅ COMPLETED
+- **Station Information Modal**: Detailed station information with edit capabilities ✅
+- **Historical Data Charts**: Interactive Chart.js visualizations with dual-tab design ✅
+  - **Environmental Data Tab**: Temperature and humidity trends over time ✅
+  - **Technical Data Tab**: Battery voltage and signal strength monitoring ✅
+- **Data Export Features**: Excel export functionality integrated within historical data modal ✅
+- **Role-based Button Visibility**: Admin vs User access to different station functions ✅
+- **Smart Dropdown Menus**: Bootstrap dropdowns with auto-refresh conflict resolution ✅
 
 #### Device Management Tab ✅ COMPLETED
-- **Basic Device Interface**: Placeholder device page for users ✅
+- **Complete Device Management Interface**: Full CRUD operations for IoT stations ✅
+- **Station Information Modal**: Comprehensive station details with Google Maps integration ✅
+- **Device Configuration Modal**: MAC address, data intervals, API token management ✅
+- **Action Buttons**: Properly spaced buttons for all device operations ✅
+- **Inline Success Messages**: Modal updates without popups for better UX ✅
 - **Role-based Access**: Available to both Admin and User roles ✅
-- **Modern Design**: Consistent with dashboard theme ✅
-- **Device Statistics**: Empty state with metrics placeholder ✅
-- **Future Ready**: Structure prepared for full device CRUD implementation ✅
+- **Modern Design**: Consistent with dashboard theme with Bootstrap 5 ✅
 
 ### 4. API Endpoints
 
@@ -102,11 +105,49 @@ A Laravel-based web application for managing ESP32 ultrasonic sensors with real-
 - `GET /api/states/{id}/districts` - Get districts for a state
 - `GET /api/devices/by-location?state=X&district=Y` - Filter devices by location
 
-#### ESP32 Device Endpoints (API Token Authentication)
-- `POST /api/config` - Device configuration retrieval
-- `POST /api/upload` - Sensor data upload with location context
+#### ESP32 Device Endpoints (API Token Authentication) ✅ COMPLETED
+- **`POST /api/config`** - Device configuration retrieval ✅
+  - **Authentication**: API Token (Bearer or parameter)
+  - **Response**: serverTime, updateRequest, nextCheckInterval, station_id, data_collection_time
+  - **Timezone**: Asia/Singapore (KL time)
+  - **Auto-reset**: Sets request_update to FALSE after config sent
+  
+- **`POST /api/upload`** - Sensor data upload with validation ✅
+  - **Authentication**: API Token (Bearer or parameter) 
+  - **Validation**: Temperature (-50 to 100°C), Humidity (0-100%), RSSI (-120 to 0 dBm), Battery (0-5V)
+  - **Station Verification**: Validates station_code matches device
+  - **Database Transaction**: Optimized for performance
+  - **Auto-reset**: Sets request_update to FALSE after upload
 
-### 5. Database Schema with Location Support
+**ESP32 Upload Request Format:**
+```json
+{
+  "station_code": "ST-NH9-1001",
+  "humidity": 65.5,
+  "temperature": 28.3,
+  "rssi": -67,
+  "battery_voltage": 3.85,
+  "update_request": false
+}
+```
+
+**Server Response Format:**
+```json
+{
+  "success": true,
+  "message": "Sensor data uploaded successfully",
+  "data": {
+    "reading_id": 145,
+    "device_id": 1,
+    "station_id": "ST-NH9-1001",
+    "timestamp": "2025-08-16 11:53:01",
+    "request_update": false
+  }
+}
+```
+
+
+### 5. Database Schema with Location Support ✅ COMPLETED
 
 ```sql
 -- Users table ✅ COMPLETED
@@ -115,20 +156,41 @@ users:
 
 -- Malaysian location reference data ✅ COMPLETED
 states: id, name, code (16 Malaysian states seeded) ✅
-districts: id, state_id, name (190+ districts seeded) ✅
+districts: id, state_id, name, district_code (190+ districts seeded) ✅
 
--- Future tables for device management
+-- IoT Devices/Stations table ✅ COMPLETED
 devices: 
-  id, user_id, name, device_id, api_token, 
-  state, district, address, status, last_seen,
-  created_at, updated_at
+  id, station_name, station_id, api_token, mac_address,
+  data_interval_minutes, data_collection_time_minutes,
+  state_id, district_id, address, gps_latitude, gps_longitude,
+  status, station_active, request_update, last_seen, created_at, updated_at
 
--- Sensor readings table
+-- Comprehensive sensor readings table ✅ COMPLETED
 sensor_readings: 
-  id, device_id, distance, boot_count, web_triggered, created_at
+  id, device_id, temperature, humidity, rssi, battery_voltage,
+  reading_time, web_triggered, created_at, updated_at
+
+**Key Features:**
+- **API Token Authentication**: Secure 64-character tokens for ESP32 devices
+- **Request Tracking**: request_update column for manual data request workflow
+- **Location Integration**: State and district relationships for filtering
+- **Timezone Support**: Asia/Singapore timezone for all timestamps
+- **Performance Optimized**: Indexed for time-series queries and location filtering
 ```
 
-### 6. Location-Enhanced Telegram Integration
+### 6. Migration Files ✅ COMPLETED
+- **Consolidated Device Migration**: Single migration file with all device fields ✅
+- **Sensor Readings Migration**: Complete sensor data structure ✅
+- **Location Reference Data**: States and districts with proper relationships ✅
+- **Database Indexing**: Optimized indexes for performance ✅
+
+### 7. Seeder Files ✅ COMPLETED
+- **Device Seeder**: 5 realistic IoT devices with varied configurations ✅
+- **Sensor Reading Seeder**: 8 hours of realistic sensor data (122 total readings) ✅
+- **Location Seeders**: Complete Malaysian states and districts data ✅
+- **User Seeder**: Admin and test users with proper roles ✅
+
+### 8. Location-Enhanced Telegram Integration
 - **Automated Notifications** when sensor data received
 - **Enhanced Message Format**: 
   ```
@@ -141,7 +203,7 @@ sensor_readings:
 - **Per-device Configuration**: Individual Telegram chat IDs per device
 - **Asia/Kuala_Lumpur Timezone**: All timestamps in Malaysian time
 
-### 7. ESP32 Integration with Location
+### 9. ESP32 Integration with Location
 - **Bearer Token Authentication** for device API calls
 - **Location-Aware Responses**: API responses include location context
 - **JSON Format** matching existing ESP32 code structure
@@ -243,48 +305,133 @@ sensor_readings:
 
 ### ✅ **COMPLETED MODULES**
 1. **User Management System**
-   - Full CRUD operations for users
-   - Role-based access control (Admin/User)
-   - Authentication with Laravel Sanctum
-   - Profile management with Telegram integration
-   - Password management and security
+   - Full CRUD operations for users ✅
+   - Role-based access control (Admin/User) ✅
+   - Authentication with Laravel Sanctum ✅
+   - Profile management with Telegram integration ✅
+   - Password management and security ✅
 
-2. **Database Foundation** 
-   - User table with role system
-   - Malaysian states and districts data (16 states, 190+ districts)
-   - Proper migrations and seeders
-   - Database relationships ready
+2. **Complete Database Foundation** 
+   - User table with role system ✅
+   - Malaysian states and districts data (16 states, 190+ districts) ✅
+   - Complete device management schema ✅
+   - Comprehensive sensor readings structure ✅
+   - All migrations and seeders implemented ✅
+   - Database relationships fully established ✅
 
-3. **Modern UI/UX**
-   - Dark blue navigation with gradient
-   - Light content area for readability
-   - Responsive dashboard with centered stats cards
-   - Role-based navigation visibility
-   - Bootstrap 5 with custom modern styling
+3. **Full Device Management System**
+   - Complete device CRUD operations ✅
+   - Station information management ✅
+   - Device configuration management ✅
+   - Location integration (State/District cascading dropdowns) ✅
+   - GPS coordinates and Google Maps integration ✅
+   - API token generation for ESP32 devices ✅
+   - Historical data management ✅
 
-4. **Navigation & Security**
-   - Role-based middleware protection
-   - Admin-only user management access
-   - Secure routing with authentication
-   - Clean navigation with role-appropriate links
+4. **Advanced Historical Data Features**
+   - Interactive historical data modal ✅
+   - Date range filtering with validation ✅
+   - Real-time auto-population ✅
+   - Excel export functionality with Laravel Excel package ✅
+   - Comprehensive sensor data display ✅
+   - Time-based data management ✅
+
+5. **Modern UI/UX**
+   - Dark blue navigation with gradient ✅
+   - Light content area for readability ✅
+   - Responsive dashboard with centered stats cards ✅
+   - Role-based navigation visibility ✅
+   - Bootstrap 5 with custom modern styling ✅
+   - Inline success messages for better UX ✅
+   - Properly spaced action buttons ✅
+
+6. **Navigation & Security**
+   - Role-based middleware protection ✅
+   - Admin-only user management access ✅
+   - Secure routing with authentication ✅
+   - Clean navigation with role-appropriate links ✅
+
+7. **Real-time Dashboard System**
+   - Complete real-time IoT monitoring dashboard ✅
+   - Live station status cards with auto-refresh ✅
+   - Role-based access control for dashboard features ✅
+   - State and District filtering with cascading dropdowns ✅
+   - Manual data request functionality with database tracking ✅
+   - Interactive historical data modals with Chart.js visualizations ✅
+   - Smart auto-refresh with user interaction detection ✅
+   - Bootstrap dropdown menus with conflict resolution ✅
+
+8. **ESP32 API Integration System**
+   - Complete ESP32 communication endpoints ✅
+   - API Token authentication with Bearer and parameter support ✅
+   - Device configuration endpoint with timezone support ✅
+   - Sensor data upload with comprehensive validation ✅
+   - Station code verification and security ✅
+   - Database transaction optimization for performance ✅
+   - Request/response cycle with auto-reset functionality ✅
+   - Complete API documentation and testing guide ✅
 
 ### 🔄 **NEXT MODULES TO IMPLEMENT**
-1. **Device Management System**
-   - Device CRUD operations
-   - Location integration (State/District selection)
-   - API token generation for ESP32 devices
+1. **Physical ESP32 Hardware Integration**
+   - Deploy API endpoints to actual ESP32 devices
+   - Test real-time data collection from sensors
+   - Validate two-way communication in production
    
-2. **Real-time Dashboard**
-   - Device status monitoring
-   - Sensor data visualization
-   - Location-based filtering
+2. **Advanced Analytics Features**
+   - Location-based analytics and reporting
+   - Sensor data trends and patterns analysis
+   - Alert system for abnormal readings
    
-3. **API Endpoints**
-   - ESP32 device communication
-   - Sensor data collection
-   - Device configuration management
-   
-4. **Telegram Integration**
-   - Notification system
+3. **Telegram Integration**
+   - Automated notification system
    - Location-aware messages
-   - Real-time alerts
+   - Real-time alerts and monitoring
+
+## Latest Updates (August 2025)
+
+### ESP32 API Integration ✅ COMPLETED
+- **Complete API endpoints**: `/api/config` and `/api/upload` fully implemented
+- **Authentication system**: API Token with Bearer header and parameter support
+- **Data validation**: Comprehensive validation for all sensor parameters
+- **Security features**: Station code verification and device authentication
+- **Performance optimization**: Database transactions and N+1 query fixes
+- **Timezone support**: KL/Singapore time formatting for all timestamps
+- **Request tracking**: Auto-reset request_update flag functionality
+- **API documentation**: Complete Postman testing guide (API_TEST.md)
+- **Error handling**: Comprehensive error responses for all scenarios
+- **Dashboard integration**: Fixed "Last Seen" display and auto-refresh conflicts
+
+### Real-time Dashboard Implementation ✅ COMPLETED
+- **Complete dashboard replacement**: New real-time dashboard is now the default interface
+- **Station monitoring cards**: Individual cards for each IoT station with live data display
+- **Auto-refresh system**: 60-second refresh cycle with smart user interaction detection
+- **Request data tracking**: Added `request_update` boolean column to devices table for tracking manual data requests
+- **Location-based filtering**: State and District dropdown filters with cascading behavior
+- **Role-based permissions**: Different dashboard access levels for Admin vs User roles
+- **Interactive modals**: Station information and historical data modals with Chart.js visualizations
+- **Excel export integration**: Historical data export functionality embedded in dashboard
+- **Bootstrap dropdown fix**: Resolved dropdown menu conflicts with auto-refresh system
+- **CSRF protection**: Fixed CSRF token issues for AJAX requests
+
+## API Testing Documentation
+
+### API_TEST.md ✅ COMPLETED
+Comprehensive Postman testing guide including:
+- **Complete endpoint documentation**: /api/config and /api/upload
+- **Authentication methods**: Bearer token and parameter examples
+- **Request/response formats**: JSON examples with all fields
+- **Test cases**: 8 detailed test scenarios covering all use cases
+- **Error handling**: All error responses documented
+- **Troubleshooting guide**: Common issues and solutions
+- **Sample data**: Real examples for immediate testing
+- **Step-by-step instructions**: Easy to follow testing workflow
+
+**Key Test Cases:**
+1. Valid API Token configuration retrieval
+2. Update request flow testing
+3. Invalid token error handling
+4. Valid sensor data upload
+5. Station code mismatch testing
+6. Validation error scenarios
+7. Manual update request testing
+8. Alternative authentication methods

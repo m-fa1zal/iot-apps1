@@ -24,12 +24,22 @@ class DatabaseSeeder extends Seeder
         $this->command->info('👥 Seeding initial users...');
         $this->call(UserSeeder::class);
         
+        // Seed IoT Devices
+        $this->command->info('📱 Seeding IoT devices...');
+        $this->call(DeviceSeeder::class);
+        
+        // Seed Sensor Readings (8 hours of data for today)
+        $this->command->info('📊 Seeding sensor readings...');
+        $this->call(SensorReadingSeeder::class);
+        
         $this->command->info('✅ Database seeding completed successfully!');
         $this->command->info('');
         $this->command->info('🎯 System is ready with:');
         $this->command->info('   • 16 Malaysian states');
         $this->command->info('   • 190+ districts across Malaysia');
         $this->command->info('   • 3 initial users (admin, test, demo)');
+        $this->command->info('   • 5 sample IoT devices');
+        $this->command->info('   • 8 hours of sensor readings data');
         $this->command->info('');
         $this->command->info('🚀 You can now start using the IoT Apps system!');
     }

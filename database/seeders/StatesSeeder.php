@@ -14,30 +14,30 @@ class StatesSeeder extends Seeder
     public function run(): void
     {
         $states = [
-            ['name' => 'Johor', 'code' => 'JHR'],
-            ['name' => 'Kedah', 'code' => 'KDH'],
-            ['name' => 'Kelantan', 'code' => 'KTN'],
-            ['name' => 'Kuala Lumpur', 'code' => 'KUL'],
-            ['name' => 'Labuan', 'code' => 'LBN'],
-            ['name' => 'Melaka', 'code' => 'MLK'],
-            ['name' => 'Negeri Sembilan', 'code' => 'NSN'],
-            ['name' => 'Pahang', 'code' => 'PHG'],
-            ['name' => 'Penang', 'code' => 'PNG'],
-            ['name' => 'Perak', 'code' => 'PRK'],
-            ['name' => 'Perlis', 'code' => 'PLS'],
-            ['name' => 'Putrajaya', 'code' => 'PJY'],
-            ['name' => 'Sabah', 'code' => 'SBH'],
-            ['name' => 'Sarawak', 'code' => 'SWK'],
-            ['name' => 'Selangor', 'code' => 'SGR'],
-            ['name' => 'Terengganu', 'code' => 'TRG'],
+            ['name' => 'Johor', 'state_code' => 'JHR'],
+            ['name' => 'Kedah', 'state_code' => 'KDH'],
+            ['name' => 'Kelantan', 'state_code' => 'KTN'],
+            ['name' => 'Kuala Lumpur', 'state_code' => 'KUL'],
+            ['name' => 'Labuan', 'state_code' => 'LBN'],
+            ['name' => 'Melaka', 'state_code' => 'MLK'],
+            ['name' => 'Negeri Sembilan', 'state_code' => 'NSN'],
+            ['name' => 'Pahang', 'state_code' => 'PHG'],
+            ['name' => 'Penang', 'state_code' => 'PNG'],
+            ['name' => 'Perak', 'state_code' => 'PRK'],
+            ['name' => 'Perlis', 'state_code' => 'PLS'],
+            ['name' => 'Putrajaya', 'state_code' => 'PJY'],
+            ['name' => 'Sabah', 'state_code' => 'SBH'],
+            ['name' => 'Sarawak', 'state_code' => 'SWK'],
+            ['name' => 'Selangor', 'state_code' => 'SGR'],
+            ['name' => 'Terengganu', 'state_code' => 'TRG'],
         ];
 
         foreach ($states as $state) {
             DB::table('states')->updateOrInsert(
-                ['code' => $state['code']],
+                ['state_code' => $state['state_code']],
                 [
                     'name' => $state['name'],
-                    'code' => $state['code'],
+                    'state_code' => $state['state_code'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]
