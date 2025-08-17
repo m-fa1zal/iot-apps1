@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Legacy;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
@@ -16,6 +16,7 @@ class ESP32Controller extends Controller
     /**
      * Get device configuration including server time, update request status, and check interval
      * 
+     * @deprecated This endpoint is deprecated. The system is migrating from REST API to MQTT broker communication.
      * @param Request $request
      * @return JsonResponse
      */
@@ -110,6 +111,7 @@ class ESP32Controller extends Controller
     /**
      * Upload sensor data from ESP32 device
      * 
+     * @deprecated This endpoint is deprecated. The system is migrating from REST API to MQTT broker communication.
      * @param Request $request
      * @return JsonResponse
      */
