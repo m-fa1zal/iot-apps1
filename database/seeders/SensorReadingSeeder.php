@@ -4,8 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Device;
-use App\Models\SensorReading;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class SensorReadingSeeder extends Seeder
@@ -15,35 +14,40 @@ class SensorReadingSeeder extends Seeder
      */
     public function run(): void
     {
-        // Get all devices
-        $devices = Device::where('station_active', true)->get();
+        // Get all active stations
+        $stations = DB::table('station_information')->where('station_active', true)->get();
         
-        if ($devices->isEmpty()) {
-            $this->command->info('No active devices found. Please run DeviceSeeder first.');
+        if ($stations->isEmpty()) {
+            $this->command->info('No active stations found. Please run StationInformationSeeder first.');
             return;
         }
+
+        $this->command->info('🌡️ Generating sensor readings for ' . $stations->count() . ' stations...');
 
         // Set base date to today
         $baseDate = Carbon::today();
         $totalReadings = 0;
+        $readings = [];
+        $deviceStatusData = [];
 
-        foreach ($devices as $device) {
+        foreach ($stations as $station) {
             // Generate 8 hours of data (from 08:00 to 16:00) with readings every 10-30 minutes
             $startTime = $baseDate->copy()->setTime(8, 0, 0); // 8:00 AM
             $endTime = $baseDate->copy()->setTime(16, 0, 0);   // 4:00 PM
             
             $currentTime = $startTime->copy();
-            $deviceReadings = 0;
+            $stationReadings = 0;
+            $lastReadingTime = $startTime->copy();
             
             while ($currentTime->lte($endTime)) {
                 // Generate realistic sensor data
                 $temperature = $this->generateTemperature($currentTime);
                 $humidity = $this->generateHumidity($currentTime, $temperature);
-                $rssi = rand(-120, -30); // RSSI range for LoRa
+                $rssi = $this->generateRSSI(); // RSSI range for MQTT/WiFi
                 $batteryVoltage = $this->generateBatteryVoltage();
                 
-                SensorReading::create([
-                    'device_id' => $device->id,
+                $readings[] = [
+                    'station_id' => $station->station_id,
                     'temperature' => $temperature,
                     'humidity' => $humidity,
                     'rssi' => $rssi,
@@ -52,20 +56,47 @@ class SensorReadingSeeder extends Seeder
                     'web_triggered' => rand(0, 10) === 0, // 10% chance of manual reading
                     'created_at' => $currentTime->copy()->addSeconds(rand(1, 300)), // Slight delay from reading time
                     'updated_at' => $currentTime->copy()->addSeconds(rand(1, 300)),
-                ]);
+                ];
                 
-                $deviceReadings++;
+                $lastReadingTime = $currentTime->copy();
+                $stationReadings++;
                 
                 // Add random interval between 10-30 minutes for next reading
                 $intervalMinutes = rand(10, 30);
                 $currentTime->addMinutes($intervalMinutes);
             }
             
-            $totalReadings += $deviceReadings;
-            $this->command->info("Generated {$deviceReadings} readings for device: {$device->station_name}");
+            // Create device status entry for each station
+            $deviceStatusData[] = [
+                'station_id' => $station->station_id,
+                'status' => $this->getRandomDeviceStatus(),
+                'request_update' => rand(0, 1),
+                'last_seen' => $lastReadingTime->addMinutes(rand(1, 15)), // Last seen within 15 minutes of last reading
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            
+            $totalReadings += $stationReadings;
+            $this->command->info("📊 Generated {$stationReadings} readings for station: {$station->station_name}");
         }
 
-        $this->command->info("Successfully created {$totalReadings} sensor readings across " . $devices->count() . " devices.");
+        // Insert all readings and device status in batches
+        $this->command->info('💾 Inserting sensor readings into database...');
+        
+        // Insert in chunks to avoid memory issues with large datasets
+        $chunks = array_chunk($readings, 100);
+        foreach ($chunks as $chunk) {
+            DB::table('sensor_readings')->insert($chunk);
+        }
+        
+        $this->command->info('📡 Creating device status records...');
+        DB::table('device_status')->insert($deviceStatusData);
+        
+        $this->command->info("✅ Successfully created {$totalReadings} sensor readings across " . $stations->count() . " stations.");
+        $this->command->info("📱 Created " . count($deviceStatusData) . " device status records.");
+        
+        // Generate some MQTT task logs for realism
+        $this->generateMqttTaskLogs($stations);
     }
 
     /**
@@ -121,5 +152,84 @@ class SensorReadingSeeder extends Seeder
         // Generate realistic values with slight random variation
         $baseVoltage = rand(320, 410) / 100; // 3.20V to 4.10V
         return round($baseVoltage, 2);
+    }
+
+    /**
+     * Generate RSSI values for MQTT/WiFi connection
+     */
+    private function generateRSSI()
+    {
+        // RSSI range for WiFi/MQTT: -30 to -90 dBm
+        // -30 to -50: Excellent signal
+        // -50 to -60: Good signal  
+        // -60 to -70: Fair signal
+        // -70 to -80: Weak signal
+        // -80 to -90: Very weak signal
+        return rand(-90, -30);
+    }
+
+    /**
+     * Get random device status
+     */
+    private function getRandomDeviceStatus()
+    {
+        $statuses = ['online', 'offline', 'maintenance'];
+        $weights = [70, 25, 5]; // 70% online, 25% offline, 5% maintenance
+        
+        $random = rand(1, 100);
+        if ($random <= $weights[0]) return $statuses[0];
+        if ($random <= $weights[0] + $weights[1]) return $statuses[1];
+        return $statuses[2];
+    }
+
+    /**
+     * Generate MQTT task logs for realism
+     */
+    private function generateMqttTaskLogs($stations)
+    {
+        $this->command->info('📨 Generating MQTT task logs...');
+        
+        $taskLogs = [];
+        $taskTypes = ['heartbeat', 'configuration_update', 'data_upload'];
+        $directions = ['request', 'response'];
+        $statuses = ['pending', 'sent', 'received', 'acknowledged', 'failed', 'timeout'];
+        
+        foreach ($stations as $station) {
+            // Generate 20-40 task logs per station
+            $logCount = rand(20, 40);
+            
+            for ($i = 0; $i < $logCount; $i++) {
+                $taskType = $taskTypes[array_rand($taskTypes)];
+                $direction = $directions[array_rand($directions)];
+                $status = $statuses[array_rand($statuses)];
+                
+                // Weight statuses towards successful completion
+                if (rand(1, 100) <= 80) {
+                    $status = ['received', 'acknowledged'][array_rand(['received', 'acknowledged'])];
+                }
+                
+                $receivedAt = Carbon::today()
+                    ->addHours(rand(8, 16))
+                    ->addMinutes(rand(0, 59))
+                    ->addSeconds(rand(0, 59));
+                
+                $taskLogs[] = [
+                    'station_id' => $station->station_id,
+                    'topic' => "iot/{$station->station_id}/{$taskType}",
+                    'task_type' => $taskType,
+                    'direction' => $direction,
+                    'status' => $status,
+                    'received_at' => $receivedAt,
+                ];
+            }
+        }
+        
+        // Insert MQTT task logs in chunks
+        $chunks = array_chunk($taskLogs, 100);
+        foreach ($chunks as $chunk) {
+            DB::table('mqtt_task_logs')->insert($chunk);
+        }
+        
+        $this->command->info("📋 Created " . count($taskLogs) . " MQTT task log entries.");
     }
 }

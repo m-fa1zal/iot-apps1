@@ -24,9 +24,14 @@ class DatabaseSeeder extends Seeder
         $this->command->info('👥 Seeding initial users...');
         $this->call(UserSeeder::class);
         
-        // Seed IoT Devices
-        $this->command->info('📱 Seeding IoT devices...');
-        $this->call(DeviceSeeder::class);
+        // Seed Station Information
+        $this->command->info('🏢 Seeding station information...');
+        $this->call(StationInformationSeeder::class);
+        
+        // Seed Device Configurations
+        $this->command->info('⚙️ Seeding device configurations...');
+        $this->call(DeviceConfigurationSeeder::class);
+        
         
         // Seed Sensor Readings (8 hours of data for today)
         $this->command->info('📊 Seeding sensor readings...');
@@ -38,7 +43,8 @@ class DatabaseSeeder extends Seeder
         $this->command->info('   • 16 Malaysian states');
         $this->command->info('   • 190+ districts across Malaysia');
         $this->command->info('   • 3 initial users (admin, test, demo)');
-        $this->command->info('   • 5 sample IoT devices');
+        $this->command->info('   • 10 monitoring stations across Malaysia');
+        $this->command->info('   • 10 device configurations with API tokens');
         $this->command->info('   • 8 hours of sensor readings data');
         $this->command->info('');
         $this->command->info('🚀 You can now start using the IoT Apps system!');

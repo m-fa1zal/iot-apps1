@@ -172,6 +172,10 @@
                                         <label class="form-label fw-bold">Location</label>
                                         <p class="mb-2" id="modalStationLocation">-</p>
                                     </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold">GPS Coordinates</label>
+                                        <p class="mb-2" id="modalGpsCoordinates">-</p>
+                                    </div>
                                     <div class="col-6">
                                         <label class="form-label fw-bold">Last Seen</label>
                                         <p class="mb-2" id="modalLastSeen">-</p>
@@ -228,33 +232,32 @@
                 </div>
             </div>
             <div class="modal-footer">
-                @if($user->isAdmin())
-                <div class="dropdown me-auto">
-                    <button class="btn btn-outline-primary dropdown-toggle" type="button" 
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-cog me-1"></i>Station Actions
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="getLatestUpdate()">
-                                <i class="fas fa-sync-alt me-2"></i>Request Data
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="showHistoricalData()">
-                                <i class="fas fa-chart-line me-2"></i>Historical Data
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                @else
-                <div class="me-auto">
-                    <button type="button" class="btn btn-success" onclick="getLatestUpdate()">
-                        <i class="fas fa-sync-alt me-1"></i>Request Data
-                    </button>
-                </div>
-                @endif
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-bell me-2"></i>Notification
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="icon-wrapper mx-auto mb-3" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); width: 60px; height: 60px;">
+                        <i class="fas fa-check-circle text-white fa-lg"></i>
+                    </div>
+                    <p class="mb-0" id="notificationMessage">Request sent successfully</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
             </div>
         </div>
     </div>
@@ -281,9 +284,12 @@
                         <label for="histEndDate" class="form-label">To Date</label>
                         <input type="date" class="form-control" id="histEndDate">
                     </div>
-                    <div class="col-md-3 d-flex align-items-end">
+                    <div class="col-md-6 d-flex align-items-end gap-2">
                         <button type="button" class="btn btn-primary" onclick="loadHistoricalCharts()">
                             <i class="fas fa-filter me-1"></i>Load Data
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportCurrentHistoricalData()">
+                            <i class="fas fa-download me-1"></i>Export Data
                         </button>
                     </div>
                 </div>
@@ -319,11 +325,6 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="me-auto">
-                    <button type="button" class="btn btn-success" onclick="exportCurrentHistoricalData()">
-                        <i class="fas fa-download me-1"></i>Export Data
-                    </button>
-                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -538,7 +539,7 @@ function createStationCard(station) {
                 <div class="mb-3">
                     <small class="text-muted d-block">
                         <i class="fas fa-map-marker-alt me-1"></i>
-                        ${station.state?.name || 'N/A'}, ${station.district?.name || 'N/A'}
+                        ${station.state_name || 'N/A'}, ${station.district_name || 'N/A'}
                     </small>
                     <small class="text-muted d-block">
                         <i class="fas fa-clock me-1"></i>
@@ -651,6 +652,15 @@ function populateStationModal(station) {
     document.getElementById('modalStationId').textContent = station.station_id;
     document.getElementById('modalStationStatus').innerHTML = getStatusBadge(station.status);
     document.getElementById('modalStationLocation').textContent = station.full_location;
+    
+    // Format GPS coordinates
+    if (station.gps_latitude && station.gps_longitude) {
+        const gpsText = `${parseFloat(station.gps_latitude).toFixed(6)}, ${parseFloat(station.gps_longitude).toFixed(6)}`;
+        document.getElementById('modalGpsCoordinates').textContent = gpsText;
+    } else {
+        document.getElementById('modalGpsCoordinates').textContent = 'Not available';
+    }
+    
     document.getElementById('modalLastSeen').textContent = station.last_seen_formatted || 'Never';
     document.getElementById('modalMacAddress').textContent = station.mac_address || 'Not set';
     
@@ -703,7 +713,7 @@ function getLatestUpdate(stationId = null) {
         }, 2000);
     }
     
-    // Simulate ESP32 update request
+    // Send MQTT update request to ESP32
     fetch(`/dashboard/station/${targetStationId}/update`, {
         method: 'POST',
         headers: {
@@ -716,20 +726,31 @@ function getLatestUpdate(stationId = null) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Show notification modal with data interval information
+            const message = `Latest Data will update within ${data.data_interval} minutes`;
+            document.getElementById('notificationMessage').textContent = message;
+            
+            const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
+            notificationModal.show();
+            
             // Don't refresh dashboard immediately - let auto-refresh handle it
             // This ensures Last Seen only updates on scheduled dashboard reload
             if (currentStationId === targetStationId) {
                 // Refresh modal if it's open for this station
                 showStationDetail(targetStationId);
             }
-            alert(data.message || 'Data request sent to station. Dashboard will update on next refresh.');
         } else {
-            alert(data.message || 'Failed to send update request');
+            // Handle offline devices or other errors - log to console instead of popup
+            let errorMessage = data.message || 'Failed to send update request';
+            if (data.last_seen) {
+                errorMessage += `\nLast seen: ${data.last_seen}`;
+            }
+            console.error('Request Data Error:', errorMessage);
         }
     })
     .catch(error => {
-        console.error('Error requesting update:', error);
-        alert('Error requesting update from station');
+        console.error('Error requesting MQTT update:', error);
+        // No popup message - silent failure, logged to console
     });
 }
 
@@ -773,7 +794,7 @@ function loadHistoricalCharts() {
     const startDate = document.getElementById('histStartDate').value;
     const endDate = document.getElementById('histEndDate').value;
     
-    fetch(`/dashboard/station/${currentStationId}/historical?start_date=${startDate}&end_date=${endDate}`, {
+    fetch(`/dashboard/station/${currentStationId}/historical?from_date=${startDate}&to_date=${endDate}`, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest'
         }
@@ -914,8 +935,12 @@ function exportStationData() {
     const startDate = document.getElementById('histStartDate').value || new Date().toISOString().split('T')[0];
     const endDate = document.getElementById('histEndDate').value || new Date().toISOString().split('T')[0];
     
-    // Create export URL
-    const exportUrl = `/devices/${currentStationId}/export-data?start_date=${startDate}&end_date=${endDate}`;
+    // Get the actual station_id from the current station data
+    const currentStation = allStationsData.find(s => s.id == currentStationId);
+    const stationId = currentStation ? currentStation.station_id : currentStationId;
+    
+    // Create export URL - using stations route with station_id
+    const exportUrl = `/stations/${stationId}/export-data?from_date=${startDate}&to_date=${endDate}`;
     
     // Trigger download
     const link = document.createElement('a');
@@ -939,8 +964,12 @@ function exportCurrentHistoricalData() {
     // Get station name from modal title
     const stationName = document.getElementById('histModalStationName').textContent;
     
-    // Create export URL with selected date range
-    const exportUrl = `/devices/${currentStationId}/export-data?start_date=${startDate}&end_date=${endDate}`;
+    // Get the actual station_id from the current station data
+    const currentStation = allStationsData.find(s => s.id == currentStationId);
+    const stationId = currentStation ? currentStation.station_id : currentStationId;
+    
+    // Create export URL with selected date range - using stations route with station_id
+    const exportUrl = `/stations/${stationId}/export-data?from_date=${startDate}&to_date=${endDate}`;
     
     // Trigger download
     const link = document.createElement('a');
@@ -979,13 +1008,13 @@ function applyFilters() {
             return false;
         }
         
-        // State filter
-        if (stateFilter && station.state && station.state.id != stateFilter) {
+        // State filter (station data includes state info directly)
+        if (stateFilter && (!station.state_id || station.state_id != stateFilter)) {
             return false;
         }
         
-        // District filter
-        if (districtFilter && station.district && station.district.id != districtFilter) {
+        // District filter (station data includes district info directly)
+        if (districtFilter && (!station.district_id || station.district_id != districtFilter)) {
             return false;
         }
         

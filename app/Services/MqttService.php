@@ -123,12 +123,23 @@ class MqttService
     }
 
     /**
-     * Send configuration to ESP32 device
+     * Send heartbeat response to ESP32 device
      */
-    public function sendConfigToDevice(array $config): bool
+    public function sendHeartbeatResponse(array $config): bool
     {
-        $topic = 'iot/config/request';
+        $topic = 'iot/heartBeat/response';
         $message = json_encode($config);
+        
+        return $this->publish($topic, $message);
+    }
+
+    /**
+     * Send configuration response to ESP32 device
+     */
+    public function sendConfigResponse(array $response): bool
+    {
+        $topic = 'iot/config/response';
+        $message = json_encode($response);
         
         return $this->publish($topic, $message);
     }
@@ -145,20 +156,29 @@ class MqttService
     }
 
     /**
-     * Subscribe to data upload topic
+     * Subscribe to heartbeat request topic
      */
-    public function subscribeToDataUpload(callable $callback): bool
+    public function subscribeToHeartbeatRequest(callable $callback): bool
     {
-        $topic = 'iot/data/upload';
+        $topic = 'iot/heartBeat/request';
         return $this->subscribe($topic, $callback);
     }
 
     /**
-     * Subscribe to config response topic
+     * Subscribe to configuration request topic
      */
-    public function subscribeToConfigResponse(callable $callback): bool
+    public function subscribeToConfigRequest(callable $callback): bool
     {
-        $topic = 'iot/config/response';
+        $topic = 'iot/config/request';
+        return $this->subscribe($topic, $callback);
+    }
+
+    /**
+     * Subscribe to data request topic
+     */
+    public function subscribeToDataRequest(callable $callback): bool
+    {
+        $topic = 'iot/data/request';
         return $this->subscribe($topic, $callback);
     }
 

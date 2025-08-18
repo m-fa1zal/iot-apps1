@@ -20,10 +20,17 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/config', [ESP32Controller::class, 'getConfig'])->name('api.legacy.config');
 Route::post('/upload', [ESP32Controller::class, 'uploadData'])->name('api.legacy.upload');
 
-// MQTT-based ESP32 Device Endpoints (API Token Authentication)
+// MQTT-based ESP32 Device Endpoints (New Process Flow)
 Route::prefix('mqtt')->group(function () {
-    Route::post('/config/request', [MqttConfigController::class, 'requestConfig'])->name('api.mqtt.config.request');
-    Route::post('/config/get', [MqttConfigController::class, 'getConfig'])->name('api.mqtt.config.get');
-    Route::post('/data/receive', [MqttDataController::class, 'receiveData'])->name('api.mqtt.data.receive');
-    Route::post('/data/request', [MqttDataController::class, 'requestData'])->name('api.mqtt.data.request');
+    // Step 5-6: Heartbeat request/response (HTTP fallback)
+    Route::post('/heartbeat/request', [MqttConfigController::class, 'handleHeartbeat'])->name('api.mqtt.heartbeat.request');
+    
+    // Step 7: Configuration request/response (HTTP fallback)
+    Route::post('/config/request', [MqttConfigController::class, 'handleConfigRequest'])->name('api.mqtt.config.request');
+    Route::get('/config/get', [MqttConfigController::class, 'getConfig'])->name('api.mqtt.config.get');
+    
+    // Step 9: Data upload request/response (HTTP fallback)
+    Route::post('/data/request', [MqttDataController::class, 'receiveData'])->name('api.mqtt.data.request');
+    Route::post('/data/manual-request', [MqttDataController::class, 'requestData'])->name('api.mqtt.data.manual-request');
+    Route::get('/data/latest', [MqttDataController::class, 'getLatestData'])->name('api.mqtt.data.latest');
 });

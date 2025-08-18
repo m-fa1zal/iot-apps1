@@ -21,7 +21,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow">
-                <div class="card-header bg-warning text-dark">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-user-edit me-2"></i>Update User Information</h5>
                 </div>
                 <div class="card-body">
@@ -64,26 +64,7 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="telegram_chat_id" class="form-label">{{ __('Telegram Chat ID') }} <small class="text-muted">(Optional)</small></label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fab fa-telegram"></i></span>
-                                        <input id="telegram_chat_id" type="text" class="form-control @error('telegram_chat_id') is-invalid @enderror" 
-                                               name="telegram_chat_id" value="{{ old('telegram_chat_id', $user->telegram_chat_id) }}">
-                                    </div>
-                                    <small class="form-text text-muted">
-                                        Enter the Telegram chat ID to enable notifications.
-                                    </small>
-                                    @error('telegram_chat_id')
-                                        <div class="invalid-feedback d-block">
-                                            <strong>{{ $message }}</strong>
-                                        </div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
+                            <div class="col-md-12">
                                 <div class="mb-3">
                                     <label for="role" class="form-label">{{ __('User Role') }} <span class="text-danger">*</span></label>
                                     <div class="input-group">
@@ -106,45 +87,6 @@
                             </div>
                         </div>
 
-                        <hr>
-
-                        <h6 class="text-muted mb-3"><i class="fas fa-key me-1"></i>Change Password <small class="text-muted">(Leave blank to keep current password)</small></h6>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="password" class="form-label">{{ __('New Password') }}</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                        <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" 
-                                               name="password">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password')">
-                                            <i class="fas fa-eye" id="password-toggle"></i>
-                                        </button>
-                                    </div>
-                                    <small class="form-text text-muted">Minimum 8 characters (leave blank to keep current password).</small>
-                                    @error('password')
-                                        <div class="invalid-feedback d-block">
-                                            <strong>{{ $message }}</strong>
-                                        </div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="password-confirm" class="form-label">{{ __('Confirm New Password') }}</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                        <input id="password-confirm" type="password" class="form-control" 
-                                               name="password_confirmation">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password-confirm')">
-                                            <i class="fas fa-eye" id="password-confirm-toggle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <div class="alert alert-info" role="alert">
                             <i class="fas fa-info-circle me-2"></i>
@@ -156,7 +98,7 @@
                             <a href="{{ route('users.index') }}" class="btn btn-secondary me-md-2">
                                 <i class="fas fa-times me-1"></i>Cancel
                             </a>
-                            <button type="submit" class="btn btn-warning text-dark">
+                            <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save me-1"></i>Update User
                             </button>
                         </div>
@@ -172,19 +114,52 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <strong>User ID:</strong> #{{ $user->id }}<br>
-                            <strong>Created:</strong> {{ $user->created_at->format('M d, Y at g:i A') }}<br>
-                            <strong>Email Verified:</strong> 
-                            @if($user->email_verified_at)
-                                <span class="badge bg-success">Yes</span> ({{ $user->email_verified_at->format('M d, Y') }})
-                            @else
-                                <span class="badge bg-warning">No</span>
-                            @endif
+                            <h6 class="text-muted mb-3">Basic Information</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>User ID:</strong></td>
+                                    <td>#{{ $user->id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email Status:</strong></td>
+                                    <td>
+                                        @if($user->email_verified_at)
+                                            <span class="badge bg-success">Verified</span><br>
+                                            <small class="text-muted">{{ $user->email_verified_at->format('M d, Y') }}</small>
+                                        @else
+                                            <span class="badge bg-warning">Not Verified</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
                         <div class="col-md-6">
-                            <strong>Last Updated:</strong> {{ $user->updated_at->format('M d, Y at g:i A') }}<br>
-                            <strong>Total Devices:</strong> <span class="badge bg-primary">0</span><br>
-                            <strong>API Tokens:</strong> <span class="badge bg-secondary">0</span>
+                            <h6 class="text-muted mb-3">Account Statistics</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Account Created:</strong></td>
+                                    <td>
+                                        {{ $user->created_at->format('M d, Y g:i A') }}<br>
+                                        <small class="text-muted">{{ $user->created_at->diffForHumans() }}</small>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Last Updated:</strong></td>
+                                    <td>
+                                        {{ $user->updated_at->format('M d, Y g:i A') }}<br>
+                                        <small class="text-muted">{{ $user->updated_at->diffForHumans() }}</small>
+                                    </td>
+                                </tr>
+                                @if($user->last_login_at)
+                                <tr>
+                                    <td><strong>Last Login:</strong></td>
+                                    <td>
+                                        {{ $user->last_login_at->format('M d, Y g:i A') }}<br>
+                                        <small class="text-muted">{{ $user->last_login_at->diffForHumans() }}</small>
+                                    </td>
+                                </tr>
+                                @endif
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -193,22 +168,4 @@
     </div>
 </div>
 
-@push('scripts')
-<script>
-function togglePassword(fieldId) {
-    const field = document.getElementById(fieldId);
-    const toggle = document.getElementById(fieldId + '-toggle');
-    
-    if (field.type === 'password') {
-        field.type = 'text';
-        toggle.classList.remove('fa-eye');
-        toggle.classList.add('fa-eye-slash');
-    } else {
-        field.type = 'password';
-        toggle.classList.remove('fa-eye-slash');
-        toggle.classList.add('fa-eye');
-    }
-}
-</script>
-@endpush
 @endsection

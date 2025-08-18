@@ -161,6 +161,25 @@
         .dropdown-item:hover {
             background-color: var(--secondary-color);
         }
+        
+        /* Readonly field styling for profile modal */
+        #profileModal input.readonly-field,
+        #profileModal textarea.readonly-field,
+        #profileModal select.readonly-field {
+            background-color: #fce7f3 !important;
+            color: #be185d !important;
+            cursor: not-allowed !important;
+            border-color: #ced4da !important;
+        }
+
+        #profileModal input.readonly-field:focus,
+        #profileModal textarea.readonly-field:focus,
+        #profileModal select.readonly-field:focus {
+            background-color: #fce7f3 !important;
+            color: #be185d !important;
+            box-shadow: 0 0 0 0.2rem rgba(236, 72, 153, 0.15) !important;
+            border-color: #f9a8d4 !important;
+        }
     </style>
     
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -206,7 +225,7 @@
                             {{ Auth::user()->name }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url('/profile') }}">
+                            <li><a class="dropdown-item" href="#" onclick="showProfileModal()">
                                 <i class="fas fa-user me-2"></i>Profile
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -230,6 +249,94 @@
         </main>
     </div>
 
+    <!-- Profile Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="profileModalLabel">
+                        <i class="fas fa-user-cog me-2"></i>Profile Management
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Success Alert -->
+                    <div class="alert alert-success alert-dismissible fade" role="alert" id="profileSuccessAlert" style="display: none;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <span id="profileSuccessMessage">Profile updated successfully!</span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    
+                    <form id="profileForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="profile_name" class="form-label">Name</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                        <input type="text" class="form-control" id="profile_name" name="name" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="profile_email" class="form-label">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email" class="form-control" id="profile_email" name="email" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h5 class="text-muted mb-3"><i class="fas fa-key me-1"></i>Change Password (Optional)</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="profile_current_password" class="form-label">Current Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" class="form-control" id="profile_current_password" name="current_password" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="profile_password" class="form-label">New Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" class="form-control" id="profile_password" name="password" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="profile_password_confirmation" class="form-label">Confirm New Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" class="form-control" id="profile_password_confirmation" name="password_confirmation" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="mt-3">
+                        <small class="text-muted" id="profile_updated_at_text">Updated At: N/A</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="editProfileBtn">
+                        <i class="fas fa-edit me-2"></i>Edit Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
@@ -240,6 +347,180 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
     <script type="text/javascript" src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    
+    <!-- Profile Modal Scripts -->
+    <script>
+    // Profile Modal Functions
+    function showProfileModal() {
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('profileModal'));
+        modal.show();
+        
+        // Load profile data
+        loadProfileData();
+    }
+
+    function loadProfileData() {
+        // Hide any success alerts
+        hideProfileSuccessAlert();
+        
+        // Set modal to view mode
+        setProfileModalMode('view');
+        
+        // Load profile data
+        populateProfileForm();
+    }
+
+    function populateProfileForm() {
+        // Get current user data from server-side (passed via PHP)
+        @auth
+        document.getElementById('profile_name').value = "{{ Auth::user()->name }}";
+        document.getElementById('profile_email').value = "{{ Auth::user()->email }}";
+        
+        // Update updated at text at bottom
+        const updatedAtText = "{{ Auth::user()->updated_at ? Auth::user()->updated_at->format('M j, Y H:i') : 'N/A' }}";
+        document.getElementById('profile_updated_at_text').textContent = `Updated At: ${updatedAtText}`;
+        @endauth
+        
+        // Clear password fields
+        document.getElementById('profile_current_password').value = '';
+        document.getElementById('profile_password').value = '';
+        document.getElementById('profile_password_confirmation').value = '';
+    }
+
+    function setProfileModalMode(mode) {
+        console.log('Setting profile modal mode to:', mode);
+        const form = document.getElementById('profileForm');
+        const editBtn = document.getElementById('editProfileBtn');
+        
+        // Hide success alert when switching modes
+        if (mode === 'edit') {
+            hideProfileSuccessAlert();
+        }
+        
+        if (mode === 'view') {
+            // Set all form fields to readonly - NO highlighting in view mode
+            form.querySelectorAll('input').forEach(input => {
+                input.readOnly = true;
+                input.classList.remove('readonly-field');
+            });
+            
+            // Show edit button
+            editBtn.style.display = 'block';
+            editBtn.innerHTML = '<i class="fas fa-edit me-2"></i>Edit Profile';
+            editBtn.onclick = () => setProfileModalMode('edit');
+        } else if (mode === 'edit') {
+            // Enable form fields except email (usually not editable)
+            // ONLY highlight fields that cannot be edited in edit mode
+            form.querySelectorAll('input').forEach(input => {
+                if (input.name === 'email') {
+                    input.readOnly = true;
+                    input.classList.add('readonly-field');
+                    console.log('Made readonly (pink highlight):', input.name);
+                } else {
+                    input.readOnly = false;
+                    input.classList.remove('readonly-field');
+                    console.log('Made editable:', input.name);
+                }
+            });
+            
+            // Change button to save
+            editBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Changes';
+            editBtn.onclick = saveProfileData;
+        }
+    }
+
+    function saveProfileData() {
+        const form = document.getElementById('profileForm');
+        const formData = new FormData(form);
+        const allData = Object.fromEntries(formData);
+        
+        // Filter data to only include expected fields
+        const data = {
+            name: allData.name,
+            email: allData.email,
+            current_password: allData.current_password,
+            password: allData.password,
+            password_confirmation: allData.password_confirmation
+        };
+        
+        console.log('Sending profile data:', data);
+        
+        // Show loading state
+        const editBtn = document.getElementById('editProfileBtn');
+        const originalText = editBtn.innerHTML;
+        editBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        editBtn.disabled = true;
+        
+        // Send update request
+        fetch('/profile', {
+            method: 'PUT',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json().then(data => ({ status: response.status, data }));
+        })
+        .then(({ status, data }) => {
+            console.log('Response data:', data);
+            
+            if (data.success) {
+                // Close modal and return to main page
+                const modal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+                modal.hide();
+                
+                // Reload page to reflect changes
+                location.reload();
+            } else {
+                let errorMessage = 'Unknown error';
+                
+                if (data.message) {
+                    errorMessage = data.message;
+                } else if (data.errors) {
+                    const errors = Object.values(data.errors).flat();
+                    errorMessage = errors.join(', ');
+                }
+                
+                console.error('Profile update failed:', data);
+                alert('Error updating profile: ' + errorMessage);
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('Error updating profile. Please check console for details.');
+        })
+        .finally(() => {
+            // Reset button
+            editBtn.innerHTML = originalText;
+            editBtn.disabled = false;
+        });
+    }
+
+    function showProfileSuccessAlert(message) {
+        const alert = document.getElementById('profileSuccessAlert');
+        const messageSpan = document.getElementById('profileSuccessMessage');
+        
+        messageSpan.textContent = message;
+        alert.style.display = 'block';
+        alert.classList.add('show');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            hideProfileSuccessAlert();
+        }, 5000);
+    }
+
+    function hideProfileSuccessAlert() {
+        const alert = document.getElementById('profileSuccessAlert');
+        alert.style.display = 'none';
+        alert.classList.remove('show');
+    }
+    </script>
     
     @stack('scripts')
 </body>

@@ -35,7 +35,6 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'telegram_chat_id' => 'nullable|string|max:255',
             'role' => 'required|in:admin,user',
         ]);
 
@@ -49,7 +48,6 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'telegram_chat_id' => $request->telegram_chat_id,
             'role' => $request->role,
             'email_verified_at' => now(),
         ]);
@@ -82,8 +80,6 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'telegram_chat_id' => 'nullable|string|max:255',
-            'password' => 'nullable|string|min:8|confirmed',
             'role' => 'required|in:admin,user',
         ]);
 
@@ -96,14 +92,8 @@ class UserController extends Controller
         $userData = [
             'name' => $request->name,
             'email' => $request->email,
-            'telegram_chat_id' => $request->telegram_chat_id,
             'role' => $request->role,
         ];
-
-        // Only update password if provided
-        if ($request->filled('password')) {
-            $userData['password'] = Hash::make($request->password);
-        }
 
         $user->update($userData);
 

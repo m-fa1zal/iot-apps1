@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('sensor_readings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('device_id')->constrained()->onDelete('cascade');
+            $table->string('station_id');
             $table->decimal('temperature', 5, 2)->nullable()->comment('Temperature in Celsius from DHT11');
             $table->decimal('humidity', 5, 2)->nullable()->comment('Humidity percentage from DHT11');
             $table->integer('rssi')->nullable()->comment('RSSI value for LoRa signal strength in dBm');
@@ -22,8 +22,9 @@ return new class extends Migration
             $table->boolean('web_triggered')->default(false)->comment('Manual vs scheduled reading');
             $table->timestamps();
             
-            $table->index(['device_id', 'created_at']);
-            $table->index(['device_id', 'reading_time']);
+            $table->index(['station_id', 'created_at']);
+            $table->index(['station_id', 'reading_time']);
+            $table->foreign('station_id')->references('station_id')->on('station_information')->onDelete('cascade');
         });
     }
 

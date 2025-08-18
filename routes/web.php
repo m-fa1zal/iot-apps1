@@ -40,29 +40,70 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [AuthController::class, 'showProfile'])->name('profile');
     Route::put('/profile', [AuthController::class, 'updateProfile'])->name('profile.update');
     
-    // Device Management - accessible by both admin and user (with restrictions)
-    Route::get('/devices', [App\Http\Controllers\DeviceController::class, 'index'])->name('devices.index');
-    Route::get('/devices/{device}', [App\Http\Controllers\DeviceController::class, 'show'])->name('devices.show');
+    // Station Management - accessible by both admin and user (with restrictions)
+    Route::get('/stations', [App\Http\Controllers\StationController::class, 'index'])->name('stations.index');
+    Route::get('/stations/{stationId}', [App\Http\Controllers\StationController::class, 'show'])->name('stations.show');
     
-    // Admin-only device management routes
+    // Legacy device routes redirect to stations
+    Route::get('/devices', function() { return redirect()->route('stations.index'); });
+    Route::get('/devices/{device}', function($device) { return redirect()->route('stations.show', $device); });
+    
+    // Admin-only station management routes
     Route::middleware('role:admin')->group(function () {
-        Route::get('/devices/create', [App\Http\Controllers\DeviceController::class, 'create'])->name('devices.create');
-        Route::post('/devices', [App\Http\Controllers\DeviceController::class, 'store'])->name('devices.store');
-        Route::get('/devices/{device}/edit', [App\Http\Controllers\DeviceController::class, 'edit'])->name('devices.edit');
-        Route::put('/devices/{device}', [App\Http\Controllers\DeviceController::class, 'update'])->name('devices.update');
-        Route::delete('/devices/{device}', [App\Http\Controllers\DeviceController::class, 'destroy'])->name('devices.destroy');
-        Route::get('/devices/{device}/regenerate-token', [App\Http\Controllers\DeviceController::class, 'regenerateToken'])->name('devices.regenerate-token');
-        Route::put('/devices/{device}/update-info', [App\Http\Controllers\DeviceController::class, 'updateInfo'])->name('devices.update-info');
-        Route::put('/devices/{device}/update-config', [App\Http\Controllers\DeviceController::class, 'updateConfig'])->name('devices.update-config');
-        Route::post('/devices/{device}/generate-token', [App\Http\Controllers\DeviceController::class, 'generateApiToken'])->name('devices.generate-token');
-        Route::get('/devices/{device}/historical-data', [App\Http\Controllers\DeviceController::class, 'getHistoricalData'])->name('devices.historical-data');
-        Route::get('/devices/{device}/export-data', [App\Http\Controllers\DeviceController::class, 'exportHistoricalData'])->name('devices.export-data');
+        Route::get('/stations/create', [App\Http\Controllers\StationController::class, 'create'])->name('stations.create');
+        Route::post('/stations', [App\Http\Controllers\StationController::class, 'store'])->name('stations.store');
+        Route::delete('/stations/{stationId}', [App\Http\Controllers\StationController::class, 'destroy'])->name('stations.destroy');
+        Route::put('/stations/{stationId}/update-info', [App\Http\Controllers\StationController::class, 'updateInfo'])->name('stations.update-info');
+        Route::put('/stations/{stationId}/update-config', [App\Http\Controllers\StationController::class, 'updateConfig'])->name('stations.update-config');
+        Route::post('/stations/{stationId}/regenerate-token', [App\Http\Controllers\StationController::class, 'regenerateToken'])->name('stations.regenerate-token');
+        Route::get('/stations/{stationId}/historical-data', [App\Http\Controllers\StationController::class, 'getHistoricalData'])->name('stations.historical-data');
+        Route::get('/stations/{stationId}/task-logs', [App\Http\Controllers\StationController::class, 'getTaskLogs'])->name('stations.task-logs');
+        Route::get('/stations/{stationId}/export-data', [App\Http\Controllers\StationController::class, 'exportData'])->name('stations.export-data');
     });
     
-    Route::get('/api/districts', [App\Http\Controllers\DeviceController::class, 'getDistricts'])->name('districts.by-state');
+    Route::get('/api/districts', [App\Http\Controllers\StationController::class, 'getDistricts'])->name('districts.by-state');
     
     // Admin only routes
     Route::middleware('role:admin')->group(function () {
         Route::resource('users', App\Http\Controllers\UserController::class);
+        
+        // API endpoint for user modal
+        Route::get('/api/users/{user}', function ($userId) {
+            try {
+                $user = \App\Models\User::findOrFail($userId);
+                return response()->json([
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                    'email_verified_at' => $user->email_verified_at,
+                    'last_login_at' => $user->last_login_at,
+                ]);
+            } catch (\Exception $e) {
+                return response()->json(['error' => $e->getMessage()], 500);
+            }
+        });
+    });
+    
+    // API endpoint for station information (accessible by all authenticated users)
+    Route::get('/api/stations/{stationId}', function ($stationId) {
+        try {
+            $station = \App\Models\StationInformation::where('station_id', $stationId)->firstOrFail();
+            return response()->json([
+                'station_id' => $station->station_id,
+                'station_name' => $station->station_name,
+                'state_id' => $station->state_id,
+                'district_id' => $station->district_id,
+                'gps_latitude' => $station->gps_latitude,
+                'gps_longitude' => $station->gps_longitude,
+                'station_active' => $station->station_active,
+                'created_at' => $station->created_at,
+                'updated_at' => $station->updated_at,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     });
 });

@@ -37,6 +37,9 @@ class AuthController extends Controller
         if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();
             
+            // Update last login timestamp
+            auth()->user()->update(['last_login_at' => now()]);
+            
             return redirect()->intended('/dashboard');
         }
 
@@ -65,6 +68,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'telegram_chat_id' => $request->telegram_chat_id,
+            'last_login_at' => now(),
         ]);
 
         Auth::login($user);

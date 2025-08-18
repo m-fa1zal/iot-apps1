@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Device;
-use App\Models\SensorReading;
 use App\Services\MqttService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MqttDataController extends Controller
 {
@@ -21,38 +20,22 @@ class MqttDataController extends Controller
     }
 
     /**
-     * Process sensor data upload from ESP32 via MQTT
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Process sensor data upload from ESP32 (HTTP fallback)
+     * Step 9: ESP32 sends sensor data → iot/data/request
      */
     public function receiveData(Request $request): JsonResponse
     {
         try {
-            $device = $this->getDeviceFromToken($request);
-            
-            if (!$device) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Invalid API token or device not found'
-                ], 401);
-            }
-
-            if (!$device->station_active) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Device is not active'
-                ], 403);
-            }
-
-            // Validate request data
+            // Validate request data - Step 9 format from process flow
             $validator = Validator::make($request->all(), [
                 'station_id' => 'required|string|max:50',
+                'task' => 'required|string',
+                'message' => 'required|string',
                 'humidity' => 'required|numeric|min:0|max:100',
                 'temperature' => 'required|numeric|min:-50|max:100',
                 'rssi' => 'required|integer|min:-120|max:0',
                 'battery_voltage' => 'required|numeric|min:0|max:5',
-                'update_request' => 'sometimes|boolean'
+                'update_request' => 'required|boolean'
             ]);
 
             if ($validator->fails()) {
@@ -63,62 +46,76 @@ class MqttDataController extends Controller
                 ], 422);
             }
 
-            // Verify station ID matches device
-            if ($request->station_id !== $device->station_id) {
+            // Find station by station ID
+            $station = DB::table('station_information')
+                ->where('station_id', $request->station_id)
+                ->where('station_active', true)
+                ->first();
+
+            if (!$station) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Station ID does not match device'
-                ], 403);
+                    'error' => 'Station not found for station ID: ' . $request->station_id
+                ], 404);
             }
 
             // Use database transaction
-            $sensorReading = DB::transaction(function () use ($device, $request) {
-                // Create sensor reading
-                $reading = SensorReading::create([
-                    'device_id' => $device->id,
+            $sensorReading = DB::transaction(function () use ($station, $request) {
+                // Create sensor reading - now using station_id instead of device_id
+                $readingId = DB::table('sensor_readings')->insertGetId([
+                    'station_id' => $station->station_id,
                     'temperature' => $request->temperature,
                     'humidity' => $request->humidity,
                     'rssi' => $request->rssi,
                     'battery_voltage' => $request->battery_voltage,
                     'reading_time' => now(),
-                    'web_triggered' => $request->boolean('update_request', false)
+                    'web_triggered' => $request->boolean('update_request', false),
+                    'created_at' => now(),
+                    'updated_at' => now()
                 ]);
 
-                // Update device status
-                $device->update([
-                    'status' => 'online',
-                    'request_update' => false
-                ]);
+                // Update device status and set request_update to FALSE as per Step 9
+                DB::table('device_status')
+                    ->where('station_id', $station->station_id)
+                    ->update([
+                        'status' => 'online',
+                        'last_seen' => now(),
+                        'request_update' => false, // ESP32 sets this to FALSE after data upload
+                        'updated_at' => now()
+                    ]);
 
-                return $reading;
+                return $readingId;
             });
 
-            // Prepare response
+            // Log MQTT task
+            DB::table('mqtt_task_logs')->insert([
+                'station_id' => $request->station_id,
+                'topic' => 'iot/data/request',
+                'task_type' => 'data_upload',
+                'direction' => 'request',
+                'status' => 'received',
+                'received_at' => now()
+            ]);
+
+            // Prepare response - Step 9 response format
             $response = [
-                'success' => true,
-                'message' => 'Sensor data received successfully',
-                'data' => [
-                    'reading_id' => $sensorReading->id,
-                    'device_id' => $device->id,
-                    'station_id' => $device->station_id,
-                    'timestamp' => $sensorReading->reading_time->setTimezone('Asia/Singapore')->format('Y-m-d H:i:s'),
-                    'request_update' => false
-                ]
+                'station_id' => $station->station_id,
+                'task' => 'Upload Data',
+                'message' => 'data received',
+                'success' => true
             ];
 
-            // Send response via MQTT
-            $this->mqttService->sendDataResponse($response);
-
-            \Log::info('MQTT Data received successfully', [
-                'device_id' => $device->id,
-                'station_id' => $device->station_id,
-                'reading_id' => $sensorReading->id
+            Log::info('MQTT Data received successfully (HTTP fallback)', [
+                'station_id' => $station->station_id,
+                'reading_id' => $sensorReading,
+                'temperature' => $request->temperature,
+                'humidity' => $request->humidity
             ]);
 
             return response()->json($response);
 
         } catch (\Exception $e) {
-            \Log::error('MQTT Data Error', [
+            Log::error('MQTT Data Error (HTTP fallback)', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->all()
@@ -132,63 +129,51 @@ class MqttDataController extends Controller
     }
 
     /**
-     * Manually trigger data request to ESP32 device
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Set update request flag for device (for manual data requests)
+     * This sets request_update = TRUE in device_status table
      */
     public function requestData(Request $request): JsonResponse
     {
         try {
-            $device = $this->getDeviceFromToken($request);
+            $request->validate([
+                'station_id' => 'required|string|max:50'
+            ]);
+
+            $station = DB::table('station_information')
+                ->where('station_id', $request->station_id)
+                ->where('station_active', true)
+                ->first();
             
-            if (!$device) {
+            if (!$station) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Invalid API token or device not found'
-                ], 401);
+                    'error' => 'Station not found for station ID: ' . $request->station_id
+                ], 404);
             }
 
-            if (!$device->station_active) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Device is not active'
-                ], 403);
-            }
-
-            // Set update request flag
-            $device->update(['request_update' => true]);
-
-            // Send request via MQTT (this could be a specific command topic)
-            $request_data = [
-                'command' => 'request_data',
-                'station_id' => $device->station_id,
-                'timestamp' => now()->setTimezone('Asia/Singapore')->format('Y-m-d H:i:s')
-            ];
-
-            $success = $this->mqttService->publish('iot/commands/request_data', json_encode($request_data));
-
-            if ($success) {
-                \Log::info('MQTT Data request sent', [
-                    'device_id' => $device->id,
-                    'station_id' => $device->station_id
+            // Set request_update flag - device will get this on next heartbeat
+            DB::table('device_status')
+                ->where('station_id', $request->station_id)
+                ->update([
+                    'request_update' => true,
+                    'updated_at' => now()
                 ]);
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Data request sent to device via MQTT'
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Failed to send data request via MQTT'
-                ], 500);
-            }
+            Log::info('Data request flag set for station', [
+                'station_id' => $station->station_id
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data request queued - device will receive on next heartbeat',
+                'station_id' => $station->station_id
+            ]);
 
         } catch (\Exception $e) {
-            \Log::error('MQTT Data Request Error', [
+            Log::error('Data Request Error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
             ]);
 
             return response()->json([
@@ -199,29 +184,42 @@ class MqttDataController extends Controller
     }
 
     /**
-     * Get device from API token
-     * 
-     * @param Request $request
-     * @return Device|null
+     * Get latest sensor data for a station
      */
-    private function getDeviceFromToken(Request $request): ?Device
+    public function getLatestData(Request $request): JsonResponse
     {
-        // Try to get token from Authorization header (Bearer token)
-        $authHeader = $request->header('Authorization');
-        if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
-            $token = substr($authHeader, 7);
-        } else {
-            // Fallback to api_token parameter
-            $token = $request->input('api_token');
-        }
+        try {
+            $request->validate([
+                'station_id' => 'required|string|max:50'
+            ]);
 
-        if (!$token) {
-            return null;
-        }
+            $latestReading = DB::table('sensor_readings')
+                ->where('station_id', $request->station_id)
+                ->orderBy('reading_time', 'desc')
+                ->first();
+            
+            if (!$latestReading) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No sensor data found for station ID: ' . $request->station_id
+                ], 404);
+            }
 
-        return Device::with(['state', 'district'])
-            ->where('api_token', $token)
-            ->where('station_active', true)
-            ->first();
+            return response()->json([
+                'success' => true,
+                'data' => $latestReading
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get Latest Data Error', [
+                'error' => $e->getMessage(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Server error occurred'
+            ], 500);
+        }
     }
 }

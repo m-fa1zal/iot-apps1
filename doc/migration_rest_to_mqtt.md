@@ -48,72 +48,188 @@ This document outlines the migration from HTTP REST API communication to MQTT br
 - [ ] Update documentation
 - [ ] Remove unused dependencies
 
-## MQTT Topics Structure (ESP32 Implementation)
+## ESP32-Server MQTT Communication Process
+
+### MQTT Topics:
+- `iot/heartBeat/request` → ESP32 → Server: Heartbeat with status, send update device is online
+- `iot/heartBeat/response` → Server → ESP32: Get Update Request and Device Configuration Request  
+- `iot/config/request` → ESP32 → Server: Update Device Configuration is Completed, set configurationUpdate to FALSE in database
+- `iot/config/response` → Server → ESP32: Server acknowledge Device Configuration is Completed
+- `iot/data/request` → ESP32 → Server: Upload latest sensor data. set updateRequest to FALSE in database
+- `iot/data/response` → Server → ESP32: Server acknowledge Sensor Data Uploaded is Completed
+
+### New Process for ESP32 and Server:
+
+**Step 1:** ESP32 in deep sleep
+
+**Step 2:** ESP32 Wake Up. Boot the device
+
+**Step 3:** rtcData save device configuration
+```
+IF (First Boot OR rtcData is corrupted) THEN
+    set configuration_update = true;
+END IF
+```
+
+**Step 4:** ESP32 Establish WiFi
+```
+IF WiFi not established THEN
+    ESP32 will sleep for 1 minute (60 seconds)
+END IF
+```
+
+**Step 5:** ESP32 send heartbeat request to MQTT Broker → `iot/heartBeat/request`
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "heartbeat",
+    "message": "data send",
+    "status": "online"
+}
+```
+
+**Step 6:** Server send response → `iot/heartBeat/response`
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "heartbeat",
+    "message": "data received",
+    "success": true,
+    "request_update": false,
+    "configuration_update": false
+}
+```
+- Set `request_update = request_update`
+- Set `configuration_update = configuration_update`
+
+**Step 7:** Check if there is configuration changes or not
+```
+IF configuration_update is TRUE THEN
+    ESP32 send configuration update complete (configuration_update = FALSE) to MQTT Broker → iot/config/request
+```
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "Configuration Update",
+    "message": "data send",
+    "configuration_update": false
+}
+```
+```
+    Server send response → iot/config/response
+```
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "Configuration Update", 
+    "message": "data received",
+    "success": true,
+    "data_collection_time": 30,
+    "data_interval": 3
+}
+```
+```
+    set dataCollectionTime = data_collection_time
+    set intervalTime = data_interval
+END IF
+```
+
+**Step 8:** Check if user having real-time update request
+```
+IF request_update is TRUE THEN
+    set readData = TRUE
+ELSE
+    set periodTime = currentTime - referenceTime
+    IF periodTime >= dataCollectionTime THEN
+        set readData = TRUE
+        set referenceTime = currentTime
+    END IF
+END IF
+```
+
+**Step 9:** Check either need to read data from DHT11
+```
+IF readData is TRUE THEN
+    read humidity, temperature from DHT11    
+    read battery voltage, battery_voltage
+    read WIFI RSSI, rssi
+    set request_update = FALSE
+    
+    ESP32 send data(humidity,temperature,battery voltage, WIFI RSSI) to MQTT Broker → iot/data/request
+```
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "Upload Data",
+    "message": "data send",
+    "humidity": 65.5,
+    "temperature": 28.3,
+    "rssi": -67,
+    "battery_voltage": 3.85,
+    "update_request": false
+}
+```
+```
+    Server send response to ESP32 → iot/data/response
+```
+```json
+{
+    "station_id": "ST-NH9-1001",
+    "task": "Upload Data",
+    "message": "data received",
+    "success": true
+}
+```
+```
+END IF
+```
+
+**Step 10:** ESP32 will sleep based on data_interval
+
+## MQTT Topics Structure
 
 ```
 iot/
+├── heartBeat/
+│   ├── request                 # ESP32 → Server: Heartbeat with status, update device online
+│   └── response                # Server → ESP32: Update request and device configuration request
 ├── config/
-│   ├── request                 # Server → ESP32: Configuration requests
-│   └── response                # ESP32 → Server: Configuration acknowledgment
+│   ├── request                 # ESP32 → Server: Configuration update completed
+│   └── response                # Server → ESP32: Acknowledge configuration completed
 └── data/
-    ├── upload                  # ESP32 → Server: Sensor data
-    └── response                # Server → ESP32: Data upload acknowledgment
+    ├── request                 # ESP32 → Server: Upload sensor data
+    └── response                # Server → ESP32: Acknowledge data upload completed
 ```
 
-### ESP32 Topics Definition:
-- `iot/config/request` - Server sends configuration requests to ESP32
-- `iot/config/response` - ESP32 sends configuration acknowledgments to server
-- `iot/data/upload` - ESP32 uploads sensor data to server
-- `iot/data/response` - Server sends upload acknowledgments to ESP32
-
-### JSON Format:
-The JSON message format remains the same as the current REST API:
-
-**Config Request (Server → ESP32 via iot/config/request):**
-```json
-{
-  "serverTime": "2025-08-17 11:08:30",
-  "updateRequest": false,
-  "nextCheckInterval": 300,
-  "station_id": "ST-NH9-1001",
-  "data_collection_time": 1800
-}
+### Topics Definition:
+- `iot/heartBeat/request` - ESP32 sends heartbeat and device status
+- `iot/heartBeat/response` - Server sends update requests and configuration status
+- `iot/config/request` - ESP32 confirms configuration update completion
+- `iot/config/response` - Server acknowledges configuration update and sends new config values
+- `iot/data/request` - ESP32 uploads sensor data
+- `iot/data/response` - Server acknowledges sensor data reception
 ```
 
-**Config Response (ESP32 → Server via iot/config/response):**
-```json
-{
-  "station_id": "ST-NH9-1001",
-  "status": "config_received",
-  "timestamp": "2025-08-17 11:08:30",
-  "message": "Configuration applied successfully"
-}
-```
+## Process Flow Summary
 
-**Data Upload (ESP32 → Server via iot/data/upload):**
-```json
-{
-  "station_id": "ST-NH9-1001",
-  "humidity": 65.5,
-  "temperature": 28.3,
-  "rssi": -67,
-  "battery_voltage": 3.85,
-  "update_request": false
-}
-```
+This comprehensive approach provides:
 
-**Data Response (Server → ESP32 via iot/data/response):**
-```json
-{
-  "success": true,
-  "message": "Sensor data received successfully",
-  "reading_id": 145,
-  "device_id": 1,
-  "station_id": "ST-NH9-1001",
-  "timestamp": "2025-08-17 11:53:01",
-  "request_update": false
-}
-```
+1. **Simple Topics**: Only 6 MQTT topics needed (3 request/response pairs)
+2. **Clear Flow**: 10-step process with detailed logic flow
+3. **Minimal Payloads**: Only essential data in JSON messages
+4. **Battery Efficient**: Deep sleep between cycles based on data_interval
+5. **Flexible Timing**: Both scheduled and on-demand data collection
+6. **Error Handling**: WiFi connection retry with fallback sleep
+7. **Configuration Management**: rtcData persistence with corruption detection
+8. **Real-time Updates**: Server-controlled update requests via flags
+
+### Key Features:
+- **Heartbeat**: ESP32 requests configuration status on every wake-up
+- **Dynamic Intervals**: Server controls sleep and data collection timing via config
+- **Update Requests**: Real-time data requests via `request_update` flag
+- **Configuration Updates**: Server sends updated config values in response
+- **Status Tracking**: Battery, WiFi RSSI, and device status monitoring
+- **Persistent Storage**: rtcData maintains configuration between deep sleep cycles
 
 ## Benefits of MQTT Migration
 

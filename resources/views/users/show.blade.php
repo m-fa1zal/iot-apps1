@@ -43,11 +43,12 @@
                     </div>
 
                     <div class="mb-3">
-                        <strong><i class="fab fa-telegram me-2 text-muted"></i>Telegram Chat ID:</strong><br>
-                        @if($user->telegram_chat_id)
-                            <span class="badge bg-success">{{ $user->telegram_chat_id }}</span>
+                        <strong><i class="fas fa-sign-in-alt me-2 text-muted"></i>Last Login:</strong><br>
+                        @if($user->last_login_at)
+                            <span class="text-muted">{{ $user->last_login_at->format('M d, Y g:i A') }}</span>
+                            <small class="d-block text-muted">{{ $user->last_login_at->diffForHumans() }}</small>
                         @else
-                            <span class="badge bg-secondary">Not Configured</span>
+                            <span class="badge bg-secondary">Never logged in</span>
                         @endif
                     </div>
 
@@ -129,6 +130,17 @@
                                     </td>
                                 </tr>
                                 <tr>
+                                    <td><strong>Last Login:</strong></td>
+                                    <td>
+                                        @if($user->last_login_at)
+                                            {{ $user->last_login_at->format('M d, Y g:i A') }}
+                                            <small class="d-block text-muted">{{ $user->last_login_at->diffForHumans() }}</small>
+                                        @else
+                                            <span class="badge bg-secondary">Never logged in</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
                                     <td><strong>Total Devices:</strong></td>
                                     <td><span class="badge bg-primary">0</span></td>
                                 </tr>
@@ -142,32 +154,6 @@
                 </div>
             </div>
 
-            <!-- Telegram Configuration -->
-            <div class="card shadow mt-4">
-                <div class="card-header bg-success text-white">
-                    <h6 class="mb-0"><i class="fab fa-telegram me-2"></i>Telegram Configuration</h6>
-                </div>
-                <div class="card-body">
-                    @if($user->telegram_chat_id)
-                        <div class="alert alert-success" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            <strong>Telegram notifications are enabled!</strong><br>
-                            Chat ID: <code>{{ $user->telegram_chat_id }}</code>
-                        </div>
-                        <p class="text-muted">This user will receive Telegram notifications for their IoT device activities.</p>
-                    @else
-                        <div class="alert alert-warning" role="alert">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Telegram notifications are not configured.</strong><br>
-                            The user won't receive any Telegram notifications for their devices.
-                        </div>
-                        <p class="text-muted">To enable Telegram notifications, edit the user profile and add their Telegram chat ID.</p>
-                        <a href="{{ route('users.edit', $user) }}" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-edit me-1"></i>Configure Telegram
-                        </a>
-                    @endif
-                </div>
-            </div>
 
             <!-- Activity Timeline (Placeholder) -->
             <div class="card shadow mt-4">

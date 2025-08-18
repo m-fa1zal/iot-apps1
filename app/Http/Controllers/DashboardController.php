@@ -2,25 +2,47 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Device;
+use App\Models\StationInformation;
 use App\Models\SensorReading;
+use App\Services\MqttService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    private $mqttService;
+
+    public function __construct(MqttService $mqttService)
+    {
+        $this->mqttService = $mqttService;
+    }
+
     /**
      * Display the dashboard
      */
     public function index()
     {
         // Get basic stats for the old dashboard
-        $totalDevices = Device::where('station_active', true)->count();
-        $onlineDevices = Device::where('station_active', true)->where('status', 'online')->count();
-        $offlineDevices = Device::where('station_active', true)->where('status', 'offline')->count();
+        $totalStations = StationInformation::where('station_active', true)->count();
         
-        return view('dashboard', compact('totalDevices', 'onlineDevices', 'offlineDevices'));
+        // Get station status from device_status table
+        $onlineStations = DB::table('station_information as si')
+            ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+            ->where('si.station_active', true)
+            ->where('ds.status', 'online')
+            ->count();
+            
+        $offlineStations = DB::table('station_information as si')
+            ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+            ->where('si.station_active', true)
+            ->where(function($query) {
+                $query->where('ds.status', 'offline')
+                      ->orWhereNull('ds.status');
+            })
+            ->count();
+        
+        return view('dashboard', compact('totalStations', 'onlineStations', 'offlineStations'));
     }
 
     /**
@@ -41,59 +63,80 @@ class DashboardController extends Controller
     public function getData()
     {
         try {
-            // Get all active devices with their latest readings
-            $devices = Device::with(['state', 'district'])
-                ->where('station_active', true)
+            // Get all active stations with their status and latest readings
+            $stations = DB::table('station_information as si')
+                ->leftJoin('states as s', 'si.state_id', '=', 's.id')
+                ->leftJoin('districts as d', 'si.district_id', '=', 'd.id')
+                ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+                ->where('si.station_active', true)
+                ->select(
+                    'si.id',
+                    'si.station_id',
+                    'si.station_name',
+                    'si.state_id',
+                    'si.district_id',
+                    'si.gps_latitude',
+                    'si.gps_longitude',
+                    's.name as state_name',
+                    'd.name as district_name',
+                    'ds.status',
+                    'ds.last_seen'
+                )
                 ->get();
 
             // Calculate summary statistics
             $summary = [
-                'total' => $devices->count(),
-                'online' => $devices->where('status', 'online')->count(),
-                'offline' => $devices->where('status', 'offline')->count(),
-                'maintenance' => $devices->where('status', 'maintenance')->count(),
+                'total' => $stations->count(),
+                'online' => $stations->where('status', 'online')->count(),
+                'offline' => $stations->where('status', 'offline')->count() + $stations->whereNull('status')->count(),
+                'maintenance' => $stations->where('status', 'maintenance')->count(),
             ];
 
-            // Get latest readings for all devices in one query (avoid N+1)
-            $latestReadings = SensorReading::select('device_id', 'temperature', 'humidity', 'battery_voltage', 'rssi', 'reading_time')
-                ->whereIn('device_id', $devices->pluck('id'))
+            // Get latest readings for all stations in one query (avoid N+1)
+            $latestReadings = DB::table('sensor_readings')
+                ->select('station_id', 'temperature', 'humidity', 'battery_voltage', 'rssi', 'reading_time')
+                ->whereIn('station_id', $stations->pluck('station_id'))
                 ->whereIn('id', function($query) {
                     $query->select(DB::raw('MAX(id)'))
                         ->from('sensor_readings')
-                        ->groupBy('device_id');
+                        ->groupBy('station_id');
                 })
                 ->get()
-                ->keyBy('device_id');
+                ->keyBy('station_id');
 
-            // Get stations with their latest readings
-            $stations = $devices->map(function ($device) use ($latestReadings) {
+            // Format stations data
+            $stationsData = $stations->map(function ($station) use ($latestReadings) {
                 // Get latest sensor reading from pre-loaded data
-                $latestReading = $latestReadings->get($device->id);
+                $latestReading = $latestReadings->get($station->station_id);
 
                 // Last seen as fixed timestamp (not relative counting time)
                 $lastSeenFormatted = null;
-                if ($latestReading && $latestReading->reading_time) {
-                    // Show fixed timestamp format instead of relative time that keeps counting
-                    // Add timezone to ensure consistency
-                    $lastSeenFormatted = $latestReading->reading_time->setTimezone('Asia/Singapore')->format('M d, Y H:i');
+                if ($station->last_seen) {
+                    $lastSeenFormatted = Carbon::parse($station->last_seen)->format('M d, Y H:i');
+                } elseif ($latestReading && $latestReading->reading_time) {
+                    $lastSeenFormatted = Carbon::parse($latestReading->reading_time)->format('M d, Y H:i');
                 } else {
                     $lastSeenFormatted = 'No data';
                 }
 
                 return [
-                    'id' => $device->id,
-                    'station_id' => $device->station_id,
-                    'station_name' => $device->station_name,
-                    'status' => $device->status,
+                    'id' => $station->id,
+                    'station_id' => $station->station_id,
+                    'station_name' => $station->station_name,
+                    'status' => $station->status ?? 'offline',
                     'last_seen_formatted' => $lastSeenFormatted,
-                    'state' => $device->state,
-                    'district' => $device->district,
+                    'state_name' => $station->state_name,
+                    'district_name' => $station->district_name,
+                    'state_id' => $station->state_id,
+                    'district_id' => $station->district_id,
+                    'gps_latitude' => $station->gps_latitude,
+                    'gps_longitude' => $station->gps_longitude,
                     'latest_reading' => $latestReading ? [
-                        'temperature' => number_format($latestReading->temperature, 1),
-                        'humidity' => number_format($latestReading->humidity, 1),
-                        'battery_voltage' => number_format($latestReading->battery_voltage, 2),
+                        'temperature' => $latestReading->temperature ? number_format($latestReading->temperature, 1) : null,
+                        'humidity' => $latestReading->humidity ? number_format($latestReading->humidity, 1) : null,
+                        'battery_voltage' => $latestReading->battery_voltage ? number_format($latestReading->battery_voltage, 2) : null,
                         'rssi' => $latestReading->rssi,
-                        'reading_time' => $latestReading->reading_time->format('Y-m-d H:i:s'),
+                        'reading_time' => $latestReading->reading_time,
                     ] : null,
                 ];
             });
@@ -101,7 +144,7 @@ class DashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'summary' => $summary,
-                'stations' => $stations,
+                'stations' => $stationsData,
             ]);
 
         } catch (\Exception $e) {
@@ -118,12 +161,24 @@ class DashboardController extends Controller
     public function getStationDetails($id)
     {
         try {
-            $device = Device::with(['state', 'district'])
-                ->where('id', $id)
-                ->where('station_active', true)
+            $station = DB::table('station_information as si')
+                ->leftJoin('states as s', 'si.state_id', '=', 's.id')
+                ->leftJoin('districts as d', 'si.district_id', '=', 'd.id')
+                ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+                ->leftJoin('device_configurations as dc', 'si.station_id', '=', 'dc.station_id')
+                ->where('si.id', $id)
+                ->where('si.station_active', true)
+                ->select(
+                    'si.*',
+                    's.name as state_name',
+                    'd.name as district_name',
+                    'ds.status',
+                    'ds.last_seen',
+                    'dc.mac_address'
+                )
                 ->first();
 
-            if (!$device) {
+            if (!$station) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Station not found',
@@ -131,25 +186,29 @@ class DashboardController extends Controller
             }
 
             // Get latest sensor reading
-            $latestReading = SensorReading::where('device_id', $device->id)
+            $latestReading = DB::table('sensor_readings')
+                ->where('station_id', $station->station_id)
                 ->orderBy('reading_time', 'desc')
                 ->first();
 
-            // Format device data
+            // Format station data
             $stationData = [
-                'id' => $device->id,
-                'station_id' => $device->station_id,
-                'station_name' => $device->station_name,
-                'status' => $device->status,
-                'mac_address' => $device->mac_address,
-                'full_location' => $device->getFullLocationAttribute(),
-                'last_seen_formatted' => $device->last_seen ? $device->last_seen->format('M d, Y H:i') : null,
+                'id' => $station->id,
+                'station_id' => $station->station_id,
+                'station_name' => $station->station_name,
+                'status' => $station->status ?? 'offline',
+                'mac_address' => $station->mac_address,
+                'full_location' => $station->state_name . ', ' . $station->district_name,
+                'gps_latitude' => $station->gps_latitude,
+                'gps_longitude' => $station->gps_longitude,
+                'address' => $station->address,
+                'last_seen_formatted' => $station->last_seen ? Carbon::parse($station->last_seen)->format('M d, Y H:i') : null,
                 'latest_reading' => $latestReading ? [
-                    'temperature' => number_format($latestReading->temperature, 1),
-                    'humidity' => number_format($latestReading->humidity, 1),
-                    'battery_voltage' => number_format($latestReading->battery_voltage, 2),
+                    'temperature' => $latestReading->temperature ? number_format($latestReading->temperature, 1) : null,
+                    'humidity' => $latestReading->humidity ? number_format($latestReading->humidity, 1) : null,
+                    'battery_voltage' => $latestReading->battery_voltage ? number_format($latestReading->battery_voltage, 2) : null,
                     'rssi' => $latestReading->rssi,
-                    'reading_time' => $latestReading->reading_time->format('Y-m-d H:i:s'),
+                    'reading_time' => $latestReading->reading_time,
                 ] : null,
             ];
 
@@ -167,101 +226,63 @@ class DashboardController extends Controller
     }
 
     /**
-     * Request latest update from ESP32 (AJAX)
+     * Request latest update from ESP32 via MQTT (AJAX)
      */
     public function requestUpdate($id)
     {
         try {
-            // Debug log for CSRF token issue
-            \Log::info('Request Update called', [
-                'device_id' => $id,
-                'request_headers' => request()->headers->all(),
+            \Log::info('MQTT Request Update called', [
+                'station_id' => $id,
                 'csrf_token' => request()->header('X-CSRF-TOKEN'),
                 'session_token' => session()->token()
             ]);
-            $device = Device::where('id', $id)
-                ->where('station_active', true)
+
+            // Get station information with device configuration
+            $station = DB::table('station_information as si')
+                ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+                ->leftJoin('device_configurations as dc', 'si.station_id', '=', 'dc.station_id')
+                ->where('si.id', $id)
+                ->where('si.station_active', true)
+                ->select('si.*', 'ds.status', 'ds.last_seen', 'ds.request_update', 'dc.data_interval')
                 ->first();
 
-            if (!$device) {
+            if (!$station) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Station not found',
                 ], 404);
             }
 
-            // In a real implementation, this would trigger the ESP32 to send new data
-            // For now, we'll simulate by creating a web-triggered sensor reading
+            // Set request_update flag - device will get this on next heartbeat (regardless of online status)
+            DB::table('device_status')
+                ->where('station_id', $station->station_id)
+                ->update(['request_update' => true, 'updated_at' => now()]);
             
-            // Check if device has recent readings to simulate with
-            $lastReading = SensorReading::where('device_id', $device->id)
-                ->orderBy('reading_time', 'desc')
-                ->first();
+            \Log::info('Data request queued via updateRequest flag', [
+                'station_db_id' => $station->id,
+                'station_id' => $station->station_id,
+                'requested_by' => auth()->user()->name
+            ]);
 
-            if ($lastReading) {
-                // Create a new "web-triggered" reading with slight variations
-                $newReading = SensorReading::create([
-                    'device_id' => $device->id,
-                    'temperature' => $lastReading->temperature + (rand(-20, 20) / 10), // ±2°C variation
-                    'humidity' => max(0, min(100, $lastReading->humidity + (rand(-50, 50) / 10))), // ±5% variation
-                    'rssi' => $lastReading->rssi + rand(-5, 5), // ±5 dBm variation
-                    'battery_voltage' => max(0, $lastReading->battery_voltage + (rand(-10, 10) / 100)), // ±0.1V variation
-                    'reading_time' => now(),
-                    'web_triggered' => true,
-                ]);
-
-                // Update device last_seen and request_update status
-                $device->update([
-                    'last_seen' => now(),
-                    'request_update' => true
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Request Data From Remote Station',
-                    'reading' => [
-                        'temperature' => number_format($newReading->temperature, 1),
-                        'humidity' => number_format($newReading->humidity, 1),
-                        'battery_voltage' => number_format($newReading->battery_voltage, 2),
-                        'rssi' => $newReading->rssi,
-                        'reading_time' => $newReading->reading_time->format('Y-m-d H:i:s'),
-                    ],
-                ]);
-            } else {
-                // No previous readings, create initial simulated data
-                $newReading = SensorReading::create([
-                    'device_id' => $device->id,
-                    'temperature' => rand(200, 350) / 10, // 20-35°C
-                    'humidity' => rand(300, 800) / 10, // 30-80%
-                    'rssi' => rand(-100, -60), // -100 to -60 dBm
-                    'battery_voltage' => rand(320, 420) / 100, // 3.2-4.2V
-                    'reading_time' => now(),
-                    'web_triggered' => true,
-                ]);
-
-                // Update device last_seen and request_update status
-                $device->update([
-                    'last_seen' => now(),
-                    'request_update' => true
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Request Data From Remote Station',
-                    'reading' => [
-                        'temperature' => number_format($newReading->temperature, 1),
-                        'humidity' => number_format($newReading->humidity, 1),
-                        'battery_voltage' => number_format($newReading->battery_voltage, 2),
-                        'rssi' => $newReading->rssi,
-                        'reading_time' => $newReading->reading_time->format('Y-m-d H:i:s'),
-                    ],
-                ]);
-            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Data request sent successfully',
+                'data_interval' => $station->data_interval ?? 5, // Default to 5 minutes if not set
+                'station_id' => $station->station_id,
+                'station_name' => $station->station_name
+            ]);
 
         } catch (\Exception $e) {
+            \Log::error('MQTT Dashboard Request Update Error', [
+                'error' => $e->getMessage(),
+                'station_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to request update: ' . $e->getMessage(),
+                'message' => 'Failed to send MQTT request to station',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -272,30 +293,32 @@ class DashboardController extends Controller
     public function getHistoricalData($id, Request $request)
     {
         try {
-            $device = Device::where('id', $id)
+            // Get station information
+            $station = DB::table('station_information')
+                ->where('id', $id)
                 ->where('station_active', true)
                 ->first();
 
-            if (!$device) {
+            if (!$station) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Station not found',
                 ], 404);
             }
 
-            $query = SensorReading::where('device_id', $device->id);
+            $query = DB::table('sensor_readings')->where('station_id', $station->station_id);
 
-            // Apply date filters
-            if ($request->filled('start_date')) {
-                $query->whereDate('reading_time', '>=', $request->start_date);
+            // Apply date filters - using from_date and to_date to match frontend
+            if ($request->filled('from_date')) {
+                $query->whereDate('reading_time', '>=', $request->from_date);
             }
 
-            if ($request->filled('end_date')) {
-                $query->whereDate('reading_time', '<=', $request->end_date);
+            if ($request->filled('to_date')) {
+                $query->whereDate('reading_time', '<=', $request->to_date);
             }
 
             // If no filters, default to today
-            if (!$request->filled('start_date') && !$request->filled('end_date')) {
+            if (!$request->filled('from_date') && !$request->filled('to_date')) {
                 $query->whereDate('reading_time', today());
             }
 
@@ -305,7 +328,7 @@ class DashboardController extends Controller
 
             $formattedReadings = $readings->map(function ($reading) {
                 return [
-                    'reading_time' => $reading->reading_time->toISOString(),
+                    'reading_time' => \Carbon\Carbon::parse($reading->reading_time)->toISOString(),
                     'temperature' => (float) $reading->temperature,
                     'humidity' => (float) $reading->humidity,
                     'battery_voltage' => (float) $reading->battery_voltage,
@@ -333,11 +356,14 @@ class DashboardController extends Controller
     public function simulateData()
     {
         try {
-            $devices = Device::where('station_active', true)->get();
+            $stations = DB::table('station_information')
+                ->where('station_active', true)
+                ->get();
 
-            foreach ($devices as $device) {
-                // Get last reading for this device
-                $lastReading = SensorReading::where('device_id', $device->id)
+            foreach ($stations as $station) {
+                // Get last reading for this station
+                $lastReading = DB::table('sensor_readings')
+                    ->where('station_id', $station->station_id)
                     ->orderBy('reading_time', 'desc')
                     ->first();
 
@@ -356,26 +382,31 @@ class DashboardController extends Controller
                 }
 
                 // Create new reading
-                SensorReading::create([
-                    'device_id' => $device->id,
+                DB::table('sensor_readings')->insert([
+                    'station_id' => $station->station_id,
                     'temperature' => $temperature,
                     'humidity' => $humidity,
                     'rssi' => $rssi,
                     'battery_voltage' => $batteryVoltage,
                     'reading_time' => now(),
                     'web_triggered' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
 
                 // Update device status and last_seen
-                $device->update([
-                    'last_seen' => now(),
-                    'status' => 'online'
-                ]);
+                DB::table('device_status')
+                    ->where('station_id', $station->station_id)
+                    ->update([
+                        'last_seen' => now(),
+                        'status' => 'online',
+                        'updated_at' => now()
+                    ]);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Simulated data generated for ' . $devices->count() . ' devices',
+                'message' => 'Simulated data generated for ' . $stations->count() . ' stations',
             ]);
 
         } catch (\Exception $e) {

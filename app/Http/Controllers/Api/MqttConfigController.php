@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Device;
 use App\Services\MqttService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class MqttConfigController extends Controller
@@ -19,76 +20,87 @@ class MqttConfigController extends Controller
     }
 
     /**
-     * Trigger config request to ESP32 device via MQTT
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Handle heartbeat request from ESP32 device (HTTP fallback)
+     * Step 5: ESP32 send heartbeat request → iot/heartBeat/request
+     * Step 6: Server send response → iot/heartBeat/response
      */
-    public function requestConfig(Request $request): JsonResponse
+    public function handleHeartbeat(Request $request): JsonResponse
     {
         try {
-            $device = $this->getDeviceFromToken($request);
+            // Validate heartbeat request data - new format from process flow
+            $request->validate([
+                'station_id' => 'required|string|max:50',
+                'task' => 'required|string',
+                'message' => 'required|string', 
+                'status' => 'required|string'
+            ]);
+
+            // Get station information with device status and configuration
+            $station = DB::table('station_information as si')
+                ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+                ->leftJoin('device_configurations as dc', 'si.station_id', '=', 'dc.station_id')
+                ->where('si.station_id', $request->station_id)
+                ->where('si.station_active', true)
+                ->select(
+                    'si.*',
+                    'ds.status',
+                    'ds.request_update',
+                    'ds.last_seen',
+                    'dc.data_interval',
+                    'dc.data_collection_time',
+                    'dc.configuration_update'
+                )
+                ->first();
             
-            if (!$device) {
+            if (!$station) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Invalid API token or device not found'
-                ], 401);
+                    'error' => 'Station not found for station ID: ' . $request->station_id
+                ], 404);
             }
 
-            if (!$device->station_active) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Device is not active'
-                ], 403);
-            }
+            // Update device status - ESP32 is online
+            DB::table('device_status')
+                ->where('station_id', $request->station_id)
+                ->update([
+                    'status' => 'online',
+                    'last_seen' => now(),
+                    'updated_at' => now()
+                ]);
 
-            // Prepare configuration data
-            $now = Carbon::now('Asia/Singapore');
-            $config = [
-                'serverTime' => $now->format('Y-m-d H:i:s'),
-                'updateRequest' => (bool) $device->request_update,
-                'nextCheckInterval' => $device->data_interval_minutes * 60,
-                'station_id' => $device->station_id,
-                'data_collection_time' => $device->data_collection_time_minutes * 60,
+            // Log MQTT task
+            DB::table('mqtt_task_logs')->insert([
+                'station_id' => $request->station_id,
+                'topic' => 'iot/heartBeat/request',
+                'task_type' => 'heartbeat',
+                'direction' => 'request',
+                'status' => 'received',
+                'received_at' => now()
+            ]);
+
+            // Prepare heartbeat response - Step 6 format
+            $response = [
+                'station_id' => $station->station_id,
+                'task' => 'heartbeat',
+                'message' => 'data received',
+                'success' => true,
+                'request_update' => (bool) $station->request_update,
+                'configuration_update' => (bool) $station->configuration_update
             ];
 
-            // Send config via MQTT
-            $success = $this->mqttService->sendConfigToDevice($config);
+            Log::info('MQTT Heartbeat processed (HTTP fallback)', [
+                'station_id' => $station->station_id,
+                'request_update' => $station->request_update,
+                'configuration_update' => $station->configuration_update
+            ]);
 
-            if ($success) {
-                // Reset update request flag and update device status
-                if ($device->request_update) {
-                    $device->update(['request_update' => false]);
-                }
-
-                $device->update([
-                    'last_seen' => now(),
-                    'status' => 'online'
-                ]);
-
-                \Log::info('MQTT Config sent successfully', [
-                    'device_id' => $device->id,
-                    'station_id' => $device->station_id,
-                    'config' => $config
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Configuration sent to device via MQTT',
-                    'data' => $config
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Failed to send configuration via MQTT'
-                ], 500);
-            }
+            return response()->json($response);
 
         } catch (\Exception $e) {
-            \Log::error('MQTT Config Error', [
+            Log::error('MQTT Heartbeat Error (HTTP fallback)', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
             ]);
 
             return response()->json([
@@ -99,59 +111,126 @@ class MqttConfigController extends Controller
     }
 
     /**
-     * Get device configuration data (for manual requests)
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     * Handle configuration update completion from ESP32
+     * Step 7: ESP32 sends configuration update complete → iot/config/request
+     */
+    public function handleConfigRequest(Request $request): JsonResponse
+    {
+        try {
+            // Validate configuration request - Step 7 format
+            $request->validate([
+                'station_id' => 'required|string|max:50',
+                'task' => 'required|string',
+                'message' => 'required|string',
+                'configuration_update' => 'required|boolean'
+            ]);
+
+            // Get station with configuration
+            $station = DB::table('station_information as si')
+                ->leftJoin('device_configurations as dc', 'si.station_id', '=', 'dc.station_id')
+                ->where('si.station_id', $request->station_id)
+                ->where('si.station_active', true)
+                ->select('si.*', 'dc.data_interval', 'dc.data_collection_time')
+                ->first();
+            
+            if (!$station) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Station not found for station ID: ' . $request->station_id
+                ], 404);
+            }
+
+            // Update configuration_update to FALSE as ESP32 confirms completion
+            DB::table('device_configurations')
+                ->where('station_id', $request->station_id)
+                ->update([
+                    'configuration_update' => false,
+                    'updated_at' => now()
+                ]);
+
+            // Log MQTT task
+            DB::table('mqtt_task_logs')->insert([
+                'station_id' => $request->station_id,
+                'topic' => 'iot/config/request',
+                'task_type' => 'configuration_update',
+                'direction' => 'request',
+                'status' => 'received',
+                'received_at' => now()
+            ]);
+
+            // Send configuration response with actual config values - Step 7 response format
+            $response = [
+                'station_id' => $station->station_id,
+                'task' => 'Configuration Update',
+                'message' => 'data received',
+                'success' => true,
+                'data_collection_time' => $station->data_collection_time,
+                'data_interval' => $station->data_interval
+            ];
+
+            Log::info('MQTT Configuration Update completed', [
+                'station_id' => $station->station_id,
+                'data_interval' => $station->data_interval,
+                'data_collection_time' => $station->data_collection_time
+            ]);
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('MQTT Configuration Request Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Server error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get device configuration for a station
      */
     public function getConfig(Request $request): JsonResponse
     {
         try {
-            $device = $this->getDeviceFromToken($request);
-            
-            if (!$device) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Invalid API token or device not found'
-                ], 401);
-            }
-
-            if (!$device->station_active) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Device is not active'
-                ], 403);
-            }
-
-            // Prepare configuration response
-            $now = Carbon::now('Asia/Singapore');
-            $config = [
-                'serverTime' => $now->format('Y-m-d H:i:s'),
-                'updateRequest' => (bool) $device->request_update,
-                'nextCheckInterval' => $device->data_interval_minutes * 60,
-                'station_id' => $device->station_id,
-                'data_collection_time' => $device->data_collection_time_minutes * 60,
-            ];
-
-            // Reset update request flag and update device status
-            if ($device->request_update) {
-                $device->update(['request_update' => false]);
-            }
-
-            $device->update([
-                'last_seen' => now(),
-                'status' => 'online'
+            $request->validate([
+                'station_id' => 'required|string|max:50'
             ]);
+
+            $config = DB::table('station_information as si')
+                ->leftJoin('device_configurations as dc', 'si.station_id', '=', 'dc.station_id')
+                ->leftJoin('device_status as ds', 'si.station_id', '=', 'ds.station_id')
+                ->where('si.station_id', $request->station_id)
+                ->where('si.station_active', true)
+                ->select(
+                    'si.station_id',
+                    'si.station_name',
+                    'dc.data_interval',
+                    'dc.data_collection_time',
+                    'dc.configuration_update',
+                    'ds.request_update'
+                )
+                ->first();
+            
+            if (!$config) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Station not found'
+                ], 404);
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => $config
+                'config' => $config
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('MQTT Get Config Error', [
+            Log::error('Get Config Error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'request_data' => $request->all()
             ]);
 
             return response()->json([
@@ -159,32 +238,5 @@ class MqttConfigController extends Controller
                 'error' => 'Server error occurred'
             ], 500);
         }
-    }
-
-    /**
-     * Get device from API token
-     * 
-     * @param Request $request
-     * @return Device|null
-     */
-    private function getDeviceFromToken(Request $request): ?Device
-    {
-        // Try to get token from Authorization header (Bearer token)
-        $authHeader = $request->header('Authorization');
-        if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
-            $token = substr($authHeader, 7);
-        } else {
-            // Fallback to api_token parameter
-            $token = $request->input('api_token');
-        }
-
-        if (!$token) {
-            return null;
-        }
-
-        return Device::with(['state', 'district'])
-            ->where('api_token', $token)
-            ->where('station_active', true)
-            ->first();
     }
 }

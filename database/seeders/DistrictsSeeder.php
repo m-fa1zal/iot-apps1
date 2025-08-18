@@ -48,30 +48,30 @@ class DistrictsSeeder extends Seeder
             ['state_code' => 'KTN', 'name' => 'Machang', 'district_code' => 'KTN05'],
             ['state_code' => 'KTN', 'name' => 'Kuala Krai', 'district_code' => 'KTN06'],
             ['state_code' => 'KTN', 'name' => 'Gua Musang', 'district_code' => 'KTN07'],
-            ['state_code' => 'KTN', 'name' => 'Bachok'],
-            ['state_code' => 'KTN', 'name' => 'Pasir Puteh'],
-            ['state_code' => 'KTN', 'name' => 'Jeli'],
+            ['state_code' => 'KTN', 'name' => 'Bachok', 'district_code' => 'KTN08'],
+            ['state_code' => 'KTN', 'name' => 'Pasir Puteh', 'district_code' => 'KTN09'],
+            ['state_code' => 'KTN', 'name' => 'Jeli', 'district_code' => 'KTN10'],
 
             // Kuala Lumpur (state_id: 4)
-            ['state_code' => 'KUL', 'name' => 'Kuala Lumpur City Centre'],
-            ['state_code' => 'KUL', 'name' => 'Cheras'],
-            ['state_code' => 'KUL', 'name' => 'Kepong'],
-            ['state_code' => 'KUL', 'name' => 'Petaling'],
-            ['state_code' => 'KUL', 'name' => 'Setiawangsa'],
-            ['state_code' => 'KUL', 'name' => 'Titiwangsa'],
-            ['state_code' => 'KUL', 'name' => 'Wangsa Maju'],
-            ['state_code' => 'KUL', 'name' => 'Lembah Pantai'],
-            ['state_code' => 'KUL', 'name' => 'Segambut'],
-            ['state_code' => 'KUL', 'name' => 'Bangsar'],
-            ['state_code' => 'KUL', 'name' => 'Bukit Bintang'],
+            ['state_code' => 'KUL', 'name' => 'Kuala Lumpur City Centre', 'district_code' => 'KUL01'],
+            ['state_code' => 'KUL', 'name' => 'Cheras', 'district_code' => 'KUL02'],
+            ['state_code' => 'KUL', 'name' => 'Kepong', 'district_code' => 'KUL03'],
+            ['state_code' => 'KUL', 'name' => 'Petaling', 'district_code' => 'KUL04'],
+            ['state_code' => 'KUL', 'name' => 'Setiawangsa', 'district_code' => 'KUL05'],
+            ['state_code' => 'KUL', 'name' => 'Titiwangsa', 'district_code' => 'KUL06'],
+            ['state_code' => 'KUL', 'name' => 'Wangsa Maju', 'district_code' => 'KUL07'],
+            ['state_code' => 'KUL', 'name' => 'Lembah Pantai', 'district_code' => 'KUL08'],
+            ['state_code' => 'KUL', 'name' => 'Segambut', 'district_code' => 'KUL09'],
+            ['state_code' => 'KUL', 'name' => 'Bangsar', 'district_code' => 'KUL10'],
+            ['state_code' => 'KUL', 'name' => 'Bukit Bintang', 'district_code' => 'KUL11'],
 
             // Labuan (state_id: 5)
-            ['state_code' => 'LBN', 'name' => 'Labuan'],
+            ['state_code' => 'LBN', 'name' => 'Labuan', 'district_code' => 'LBN01'],
 
-            // Melaka (state_id: 6)
-            ['state_code' => 'MLK', 'name' => 'Melaka Tengah'],
-            ['state_code' => 'MLK', 'name' => 'Alor Gajah'],
-            ['state_code' => 'MLK', 'name' => 'Jasin'],
+            // Melaka (state_id: 5) - Fixed comment
+            ['state_code' => 'MLK', 'name' => 'Melaka Tengah', 'district_code' => 'MLK01'],
+            ['state_code' => 'MLK', 'name' => 'Alor Gajah', 'district_code' => 'MLK02'],
+            ['state_code' => 'MLK', 'name' => 'Jasin', 'district_code' => 'MLK03'],
 
             // Negeri Sembilan (state_id: 7)
             ['state_code' => 'NSN', 'name' => 'Seremban'],
@@ -122,7 +122,7 @@ class DistrictsSeeder extends Seeder
             ['state_code' => 'PLS', 'name' => 'Padang Besar'],
 
             // Putrajaya (state_id: 12)
-            ['state_code' => 'PJY', 'name' => 'Putrajaya'],
+            ['state_code' => 'PJY', 'name' => 'Putrajaya', 'district_code' => 'PJY01'],
 
             // Sabah (state_id: 13)
             ['state_code' => 'SBH', 'name' => 'Kota Kinabalu'],
