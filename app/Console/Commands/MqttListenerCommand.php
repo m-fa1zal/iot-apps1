@@ -61,6 +61,14 @@ class MqttListenerCommand extends Command
      */
     private function startMqttListener(array $topics)
     {
+        // Debug: Print MQTT connection details
+        $this->info('MQTT Configuration:');
+        $this->info('  Host: ' . config('mqtt.host', 'NOT SET'));
+        $this->info('  Port: ' . config('mqtt.port', 'NOT SET'));
+        $this->info('  Username: ' . config('mqtt.username', 'NOT SET'));
+        $this->info('  Password: ' . (config('mqtt.password') ? '***SET***' : 'NOT SET'));
+        $this->info('  Client ID: ' . config('mqtt.client_id', 'NOT SET'));
+        
         $this->info('Connecting to MQTT broker...');
         
         if (!$this->mqttService->connect()) {
