@@ -1177,10 +1177,20 @@ window.addEventListener('beforeunload', function() {
     max-width: 1200px;
 }
 
+.nav-tabs {
+    min-height: 60px;
+    align-items: center;
+    display: flex;
+}
+
 .nav-tabs .nav-link {
     border: none;
     color: #6c757d;
     font-weight: 500;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
 }
 
 .nav-tabs .nav-link.active {

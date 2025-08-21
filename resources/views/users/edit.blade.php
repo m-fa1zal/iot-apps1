@@ -125,7 +125,6 @@
                                     <td>
                                         @if($user->email_verified_at)
                                             <span class="badge bg-success">Verified</span><br>
-                                            <small class="text-muted">{{ $user->email_verified_at->format('M d, Y') }}</small>
                                         @else
                                             <span class="badge bg-warning">Not Verified</span>
                                         @endif

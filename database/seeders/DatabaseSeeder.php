@@ -37,6 +37,10 @@ class DatabaseSeeder extends Seeder
         $this->command->info('📊 Seeding sensor readings...');
         $this->call(SensorReadingSeeder::class);
         
+        // Seed MQTT Task Logs (7 days of logs)
+        $this->command->info('📨 Seeding MQTT task logs...');
+        $this->call(MqttTaskLogSeeder::class);
+        
         $this->command->info('✅ Database seeding completed successfully!');
         $this->command->info('');
         $this->command->info('🎯 System is ready with:');
@@ -46,6 +50,7 @@ class DatabaseSeeder extends Seeder
         $this->command->info('   • 10 monitoring stations across Malaysia');
         $this->command->info('   • 10 device configurations with API tokens');
         $this->command->info('   • 8 hours of sensor readings data');
+        $this->command->info('   • 7 days of MQTT task logs with response times and retry counts');
         $this->command->info('');
         $this->command->info('🚀 You can now start using the IoT Apps system!');
     }

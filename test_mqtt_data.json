@@ -1,0 +1,13 @@
+{
+    "station_id": "KL001",
+    "api_key": "WoLooquIzWvuE29kFWoQqhAKudNuEuJksnQkyT4OGlcKmd4D3jOzAYp2ua0x4Web",
+    "task": "Upload Data",
+    "message": "SEND",
+    "params": {
+        "humidity": 65.5,
+        "temperature": 28.3,
+        "rssi": -67,
+        "battery_voltage": 3.85,
+        "update_request": false
+    }
+}

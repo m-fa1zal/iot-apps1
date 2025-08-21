@@ -94,9 +94,6 @@ class SensorReadingSeeder extends Seeder
         
         $this->command->info("✅ Successfully created {$totalReadings} sensor readings across " . $stations->count() . " stations.");
         $this->command->info("📱 Created " . count($deviceStatusData) . " device status records.");
-        
-        // Generate some MQTT task logs for realism
-        $this->generateMqttTaskLogs($stations);
     }
 
     /**
@@ -182,54 +179,4 @@ class SensorReadingSeeder extends Seeder
         return $statuses[2];
     }
 
-    /**
-     * Generate MQTT task logs for realism
-     */
-    private function generateMqttTaskLogs($stations)
-    {
-        $this->command->info('📨 Generating MQTT task logs...');
-        
-        $taskLogs = [];
-        $taskTypes = ['heartbeat', 'configuration_update', 'data_upload'];
-        $directions = ['request', 'response'];
-        $statuses = ['pending', 'sent', 'received', 'acknowledged', 'failed', 'timeout'];
-        
-        foreach ($stations as $station) {
-            // Generate 20-40 task logs per station
-            $logCount = rand(20, 40);
-            
-            for ($i = 0; $i < $logCount; $i++) {
-                $taskType = $taskTypes[array_rand($taskTypes)];
-                $direction = $directions[array_rand($directions)];
-                $status = $statuses[array_rand($statuses)];
-                
-                // Weight statuses towards successful completion
-                if (rand(1, 100) <= 80) {
-                    $status = ['received', 'acknowledged'][array_rand(['received', 'acknowledged'])];
-                }
-                
-                $receivedAt = Carbon::today()
-                    ->addHours(rand(8, 16))
-                    ->addMinutes(rand(0, 59))
-                    ->addSeconds(rand(0, 59));
-                
-                $taskLogs[] = [
-                    'station_id' => $station->station_id,
-                    'topic' => "iot/{$station->station_id}/{$taskType}",
-                    'task_type' => $taskType,
-                    'direction' => $direction,
-                    'status' => $status,
-                    'received_at' => $receivedAt,
-                ];
-            }
-        }
-        
-        // Insert MQTT task logs in chunks
-        $chunks = array_chunk($taskLogs, 100);
-        foreach ($chunks as $chunk) {
-            DB::table('mqtt_task_logs')->insert($chunk);
-        }
-        
-        $this->command->info("📋 Created " . count($taskLogs) . " MQTT task log entries.");
-    }
 }

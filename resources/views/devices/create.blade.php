@@ -448,9 +448,19 @@ $(document).ready(function() {
     color: #dc3545;
 }
 
+.nav-tabs {
+    min-height: 60px;
+    align-items: center;
+    display: flex;
+}
+
 .nav-tabs .nav-link {
     border-radius: 0.5rem 0.5rem 0 0;
     transition: all 0.3s ease;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
 }
 
 .nav-tabs .nav-link.active {
