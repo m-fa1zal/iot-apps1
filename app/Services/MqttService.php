@@ -39,10 +39,7 @@ class MqttService
         $this->client = new MqttClient($this->mqtt_host, $this->mqtt_port, $clientId);
         
         $this->connectionSettings = (new ConnectionSettings())
-            ->setKeepAliveInterval(60)
-            ->setLastWillTopic('iot/status/disconnect')
-            ->setLastWillMessage('Laravel MQTT service disconnected')
-            ->setLastWillQualityOfService(0);
+            ->setKeepAliveInterval(60);
             
         if (!empty($this->mqtt_username)) {
             $this->connectionSettings
