@@ -8,6 +8,6 @@
     "numReplicas": 1,
     "sleepApplication": false,
     "restartPolicyType": "always",
-    "startCommand": "bash railway-start.sh"
+    "startCommand": "bash railway-mqtt.sh"
   }
 }

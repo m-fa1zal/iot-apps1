@@ -36,7 +36,7 @@ echo "⚙️  Setting environment variables for web service..."
 railway variables set RAILWAY_SERVICE_NAME=web --service web
 
 # Deploy MQTT Service  
-echo "📡 Deploying MQTT Service..."
+echo "📡 Deploying dedicated MQTT Listener Service..."
 railway service create mqtt
 cp railway-mqtt.json railway.json
 railway up --service mqtt
@@ -44,6 +44,10 @@ railway up --service mqtt
 # Set environment variables for MQTT service
 echo "⚙️  Setting environment variables for MQTT service..."
 railway variables set RAILWAY_SERVICE_NAME=mqtt --service mqtt
+railway variables set MQTT_HOST="your-mqtt-broker-host" --service mqtt
+railway variables set MQTT_PORT="1883" --service mqtt
+railway variables set MQTT_USERNAME="root" --service mqtt
+railway variables set MQTT_PASSWORD="your-mqtt-password" --service mqtt
 
 # Deploy Worker Service
 echo "⚙️  Deploying Worker Service..."
@@ -61,11 +65,16 @@ cp railway-web.json railway.json
 echo "✅ Deployment complete!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Set up your database connection in Railway dashboard"
-echo "2. Configure MQTT broker settings"
-echo "3. Set APP_KEY and other environment variables"
+echo "1. Update MQTT broker settings in Railway dashboard for the 'mqtt' service:"
+echo "   - MQTT_HOST: your actual MQTT broker host"
+echo "   - MQTT_PASSWORD: your actual MQTT broker password"
+echo "2. Set up your database connection in Railway dashboard"
+echo "3. Set APP_KEY and other environment variables for all services"
 echo "4. Check service logs: railway logs --service [web|mqtt|worker]"
 echo ""
 echo "🔗 Service URLs:"
 echo "- Web: Check Railway dashboard for the generated URL"
-echo "- MQTT & Worker: Background services (no public URLs)"
+echo "- MQTT: Dedicated listener service (processes IoT messages)"
+echo "- Worker: Background job processor (no public URL)"
+echo ""
+echo "📡 MQTT Service will now process messages from topics: iot/*"
