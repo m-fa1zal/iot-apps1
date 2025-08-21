@@ -1,0 +1,8 @@
+[phases.build]
+cmds = ["composer install --no-dev --optimize-autoloader --ignore-platform-reqs"]
+
+[phases.start]
+cmd = "bash railway-start.sh"
+
+[variables]
+PHP_VERSION = "8.2"

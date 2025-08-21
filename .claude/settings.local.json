@@ -5,7 +5,8 @@
       "Bash(where choco)",
       "Bash(winget:*)",
       "Bash(choco install:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []
