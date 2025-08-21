@@ -81,9 +81,12 @@ LOG_DAILY_DAYS=7
 ## Files Included
 
 ### Core Files
-- `Procfile` - Process definitions for Railway
-- `railway.json` - Railway configuration
+- `railway.json` - Default Railway configuration  
+- `railway-web.json` - Web service configuration
+- `railway-mqtt.json` - MQTT service configuration
+- `railway-worker.json` - Worker service configuration
 - `railway-start.sh` - Main startup script
+- `deploy-services.sh` - Automated deployment script
 
 ### Docker Option
 - `docker/Dockerfile.railway` - Railway-optimized Dockerfile
@@ -96,25 +99,43 @@ LOG_DAILY_DAYS=7
 
 ## Deployment Commands
 
-### Using Railway CLI
+### Automated Multi-Service Deployment
 ```bash
-# Deploy to Railway
-railway up
-
-# View logs
-railway logs
-
-# Connect to shell
-railway shell
+# Use the automated deployment script
+chmod +x deploy-services.sh
+./deploy-services.sh
 ```
 
-### Environment Setup
+### Manual Multi-Service Deployment
 ```bash
-# Set service name for MQTT
-railway variables set RAILWAY_SERVICE_NAME=mqtt
+# 1. Create and deploy web service
+railway service create web
+cp railway-web.json railway.json
+railway up --service web
+railway variables set RAILWAY_SERVICE_NAME=web --service web
 
-# Set service name for web
-railway variables set RAILWAY_SERVICE_NAME=web
+# 2. Create and deploy MQTT service  
+railway service create mqtt
+cp railway-mqtt.json railway.json
+railway up --service mqtt
+railway variables set RAILWAY_SERVICE_NAME=mqtt --service mqtt
+
+# 3. Create and deploy worker service
+railway service create worker
+cp railway-worker.json railway.json  
+railway up --service worker
+railway variables set RAILWAY_SERVICE_NAME=worker --service worker
+```
+
+### Service Management
+```bash
+# View logs for specific service
+railway logs --service web
+railway logs --service mqtt
+railway logs --service worker
+
+# Connect to specific service shell
+railway shell --service web
 ```
 
 ## Monitoring
