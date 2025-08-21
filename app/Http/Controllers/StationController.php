@@ -79,14 +79,15 @@ class StationController extends Controller
      */
     public function store(Request $request)
     {
+        // Validate input data
         $validator = Validator::make($request->all(), [
             'station_name' => 'required|string|max:255',
             'state_id' => 'required|exists:states,id',
             'district_id' => 'required|exists:districts,id',
-            'address' => 'nullable|string',
+            'address' => 'nullable|string|max:500',
             'gps_latitude' => 'nullable|numeric|between:-90,90',
             'gps_longitude' => 'nullable|numeric|between:-180,180',
-            'mac_address' => 'required|string|max:17',
+            'mac_address' => 'required|string|max:17|regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
             'data_interval' => 'required|integer|min:1|max:60',
             'data_collection_time' => 'required|integer|min:10|max:300',
         ]);
@@ -97,18 +98,37 @@ class StationController extends Controller
                 ->withInput();
         }
 
+        // Set database timeout to prevent 504 errors
+        DB::statement('SET SESSION wait_timeout = 30');
+        DB::statement('SET SESSION innodb_lock_wait_timeout = 30');
+
         DB::beginTransaction();
         try {
-            // Generate unique station_id
+            // Validate district exists and has proper setup
+            $district = DB::table('districts')->where('id', $request->district_id)->first();
+            if (!$district) {
+                throw new \Exception('Selected district not found');
+            }
+
+            // Generate unique station_id with timeout protection
             $stationId = $this->generateStationId($request->district_id);
 
+            // Validate MAC address uniqueness
+            $existingMac = DB::table('device_configurations')
+                ->where('mac_address', $request->mac_address)
+                ->exists();
+            
+            if ($existingMac) {
+                throw new \Exception('MAC address already exists in the system');
+            }
+
             // Create station information
-            DB::table('station_information')->insert([
-                'station_name' => $request->station_name,
+            $stationInserted = DB::table('station_information')->insert([
+                'station_name' => trim($request->station_name),
                 'station_id' => $stationId,
                 'state_id' => $request->state_id,
                 'district_id' => $request->district_id,
-                'address' => $request->address,
+                'address' => trim($request->address),
                 'gps_latitude' => $request->gps_latitude,
                 'gps_longitude' => $request->gps_longitude,
                 'station_active' => true,
@@ -116,11 +136,15 @@ class StationController extends Controller
                 'updated_at' => now(),
             ]);
 
+            if (!$stationInserted) {
+                throw new \Exception('Failed to create station information');
+            }
+
             // Create device configuration
-            DB::table('device_configurations')->insert([
+            $configInserted = DB::table('device_configurations')->insert([
                 'station_id' => $stationId,
                 'api_token' => \Illuminate\Support\Str::random(64),
-                'mac_address' => $request->mac_address,
+                'mac_address' => strtoupper($request->mac_address),
                 'data_interval' => $request->data_interval,
                 'data_collection_time' => $request->data_collection_time,
                 'configuration_update' => false,
@@ -128,8 +152,12 @@ class StationController extends Controller
                 'updated_at' => now(),
             ]);
 
+            if (!$configInserted) {
+                throw new \Exception('Failed to create device configuration');
+            }
+
             // Create device status
-            DB::table('device_status')->insert([
+            $statusInserted = DB::table('device_status')->insert([
                 'station_id' => $stationId,
                 'status' => 'offline',
                 'request_update' => false,
@@ -138,13 +166,42 @@ class StationController extends Controller
                 'updated_at' => now(),
             ]);
 
+            if (!$statusInserted) {
+                throw new \Exception('Failed to create device status');
+            }
+
             DB::commit();
+
+            // Check if request expects JSON (AJAX)
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Station created successfully! Station ID: ' . $stationId,
+                    'station_id' => $stationId
+                ]);
+            }
 
             return redirect()->route('stations.index')
                 ->with('success', 'Station created successfully! Station ID: ' . $stationId);
 
         } catch (\Exception $e) {
             DB::rollback();
+            
+            // Log the error for debugging
+            \Log::error('Station creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['_token']),
+            ]);
+
+            // Check if request expects JSON (AJAX)
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to create station: ' . $e->getMessage()
+                ], 422);
+            }
+
             return redirect()->back()
                 ->with('error', 'Failed to create station: ' . $e->getMessage())
                 ->withInput();
@@ -282,7 +339,7 @@ class StationController extends Controller
         $validator = Validator::make($request->all(), [
             'mac_address' => 'required|string|max:17',
             'data_interval' => 'required|integer|min:1|max:60',
-            'data_collection_time' => 'required|integer|min:10|max:300',
+            'data_collection_time' => 'required|integer|min:1|max:300',
         ]);
 
         if ($validator->fails()) {
@@ -473,6 +530,43 @@ class StationController extends Controller
     }
 
     /**
+     * Validate MAC address uniqueness
+     */
+    public function validateMacAddress(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'mac_address' => 'required|string|max:17',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'available' => false,
+                'error' => 'Invalid MAC address format'
+            ], 422);
+        }
+
+        try {
+            // Check if MAC address already exists
+            $exists = DB::table('device_configurations')
+                ->where('mac_address', strtoupper($request->mac_address))
+                ->exists();
+
+            return response()->json([
+                'available' => !$exists,
+                'message' => $exists ? 'MAC address already exists' : 'MAC address is available'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('MAC address validation error: ' . $e->getMessage());
+            
+            return response()->json([
+                'available' => false,
+                'error' => 'Unable to validate MAC address'
+            ], 500);
+        }
+    }
+
+    /**
      * Export historical sensor data for station as CSV
      */
     public function exportData(Request $request, $stationId)
@@ -577,8 +671,15 @@ class StationController extends Controller
     private function generateStationId($districtId)
     {
         $district = District::find($districtId);
-        if (!$district || !$district->district_code) {
-            throw new \Exception('Invalid district or missing district code');
+        if (!$district) {
+            throw new \Exception('Invalid district selected');
+        }
+
+        // Use district code if available, otherwise generate from district name
+        $districtCode = $district->district_code ?? $district->code ?? strtoupper(substr($district->name, 0, 3));
+        
+        if (empty($districtCode)) {
+            throw new \Exception('Unable to generate district code for station ID');
         }
 
         // Get count of existing stations in this district
@@ -588,6 +689,6 @@ class StationController extends Controller
 
         // Generate station_id: DISTRICT_CODE + sequential number
         $sequenceNumber = str_pad($existingCount + 1, 3, '0', STR_PAD_LEFT);
-        return $district->district_code . $sequenceNumber;
+        return $districtCode . $sequenceNumber;
     }
 }

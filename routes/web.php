@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     });
     
     Route::get('/api/districts', [App\Http\Controllers\StationController::class, 'getDistricts'])->name('districts.by-state');
+    Route::post('/api/validate-mac-address', [App\Http\Controllers\StationController::class, 'validateMacAddress'])->name('validate.mac-address');
     
     // Admin only routes
     Route::middleware('role:admin')->group(function () {

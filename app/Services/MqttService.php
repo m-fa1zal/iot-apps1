@@ -2,20 +2,53 @@
 
 namespace App\Services;
 
-use PhpMqtt\Client\Facades\MQTT;
+use App\Models\SensorReading;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use PhpMqtt\Client\MqttClient;
+use PhpMqtt\Client\ConnectionSettings;
 
 class MqttService
 {
-    private $connectionName = 'default';
-    private $isConnected = false;
+    protected $mqtt_host;
+    protected $mqtt_port;
+    protected $mqtt_username;
+    protected $mqtt_password;
+    protected $client;
+    protected $connectionSettings;
+    protected $isConnected = false;
+
+    public function __construct()
+    {
+        $this->mqtt_host = config('mqtt.host', 'localhost');
+        $this->mqtt_port = config('mqtt.port', 1883);
+        $this->mqtt_username = config('mqtt.username', '');
+        $this->mqtt_password = config('mqtt.password', '');
+        
+        $this->initializeClient();
+    }
 
     /**
-     * Get MQTT connection
+     * Initialize MQTT client with configuration
      */
-    private function getConnection()
+    private function initializeClient()
     {
-        return MQTT::connection($this->connectionName);
+        $clientId = config('mqtt.client_id', 'laravel_iot_' . uniqid());
+        
+        $this->client = new MqttClient($this->mqtt_host, $this->mqtt_port, $clientId);
+        
+        $this->connectionSettings = (new ConnectionSettings())
+            ->setKeepAliveInterval(60)
+            ->setLastWillTopic('iot/status/disconnect')
+            ->setLastWillMessage('Laravel MQTT service disconnected')
+            ->setLastWillQualityOfService(0);
+            
+        if (!empty($this->mqtt_username)) {
+            $this->connectionSettings
+                ->setUsername($this->mqtt_username)
+                ->setPassword($this->mqtt_password);
+        }
     }
 
     /**
@@ -25,9 +58,9 @@ class MqttService
     {
         try {
             if (!$this->isConnected) {
-                $this->getConnection()->connect();
+                $this->client->connect($this->connectionSettings, true);
                 $this->isConnected = true;
-                Log::info('MQTT Service connected successfully');
+                Log::info('MQTT Service connected successfully to ' . $this->mqtt_host . ':' . $this->mqtt_port);
             }
             return true;
         } catch (\Exception $e) {
@@ -43,40 +76,12 @@ class MqttService
     {
         try {
             if ($this->isConnected) {
-                $this->getConnection()->disconnect();
+                $this->client->disconnect();
                 $this->isConnected = false;
                 Log::info('MQTT Service disconnected');
             }
         } catch (\Exception $e) {
             Log::error('MQTT disconnect error: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Publish message to topic
-     */
-    public function publish(string $topic, string $message, int $qos = 0): bool
-    {
-        try {
-            if (!$this->isConnected && !$this->connect()) {
-                return false;
-            }
-
-            $this->getConnection()->publish($topic, $message, $qos);
-            
-            Log::info('MQTT message published', [
-                'topic' => $topic,
-                'message_length' => strlen($message),
-                'qos' => $qos
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MQTT publish failed: ' . $e->getMessage(), [
-                'topic' => $topic,
-                'message' => $message
-            ]);
-            return false;
         }
     }
 
@@ -90,9 +95,9 @@ class MqttService
                 return false;
             }
 
-            $this->getConnection()->subscribe($topic, $callback, $qos);
+            $this->client->subscribe($topic, $callback, $qos);
             
-            Log::info('MQTT subscribed to topic', [
+            Log::debug('MQTT subscribed to topic', [
                 'topic' => $topic,
                 'qos' => $qos
             ]);
@@ -109,77 +114,17 @@ class MqttService
     /**
      * Listen for messages (blocking)
      */
-    public function loop(int $timeoutSeconds = 60): void
+    public function loop(int $timeoutSeconds = 1): void
     {
         try {
             if (!$this->isConnected && !$this->connect()) {
                 return;
             }
 
-            $this->getConnection()->loop(true, true, $timeoutSeconds);
+            $this->client->loop(true, true, $timeoutSeconds);
         } catch (\Exception $e) {
             Log::error('MQTT loop error: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Send heartbeat response to ESP32 device
-     */
-    public function sendHeartbeatResponse(array $config): bool
-    {
-        $topic = 'iot/heartBeat/response';
-        $message = json_encode($config);
-        
-        return $this->publish($topic, $message);
-    }
-
-    /**
-     * Send configuration response to ESP32 device
-     */
-    public function sendConfigResponse(array $response): bool
-    {
-        $topic = 'iot/config/response';
-        $message = json_encode($response);
-        
-        return $this->publish($topic, $message);
-    }
-
-    /**
-     * Send data upload response to ESP32 device
-     */
-    public function sendDataResponse(array $response): bool
-    {
-        $topic = 'iot/data/response';
-        $message = json_encode($response);
-        
-        return $this->publish($topic, $message);
-    }
-
-    /**
-     * Subscribe to heartbeat request topic
-     */
-    public function subscribeToHeartbeatRequest(callable $callback): bool
-    {
-        $topic = 'iot/heartBeat/request';
-        return $this->subscribe($topic, $callback);
-    }
-
-    /**
-     * Subscribe to configuration request topic
-     */
-    public function subscribeToConfigRequest(callable $callback): bool
-    {
-        $topic = 'iot/config/request';
-        return $this->subscribe($topic, $callback);
-    }
-
-    /**
-     * Subscribe to data request topic
-     */
-    public function subscribeToDataRequest(callable $callback): bool
-    {
-        $topic = 'iot/data/request';
-        return $this->subscribe($topic, $callback);
     }
 
     /**
@@ -191,10 +136,326 @@ class MqttService
     }
 
     /**
-     * Get connection instance
+     * Handle heartbeat request from ESP32
      */
-    public function getClient()
+    public function handleHeartbeat(array $payload): array
     {
-        return $this->getConnection();
+        try {
+            $stationId = $payload['station_id'] ?? null;
+            $apiKey = $payload['api_key'] ?? null;
+            $task = $payload['task'] ?? null;
+            $message = $payload['message'] ?? null;
+            $params = $payload['params'] ?? [];
+
+            if (!$stationId || !$apiKey || $task !== 'heartbeat' || $message !== 'SEND') {
+                return $this->createErrorResponse($stationId, $apiKey, 'heartbeat', 'Invalid payload format');
+            }
+
+            $deviceConfig = $this->authenticateDevice($stationId, $apiKey);
+            if (!$deviceConfig) {
+                return $this->createErrorResponse($stationId, $apiKey, 'heartbeat', 'Invalid device credentials');
+            }
+
+            // Update device status and last seen
+            DB::table('device_status')
+                ->where('station_id', $stationId)
+                ->update([
+                    'status' => $params['status'] ?? 'online',
+                    'last_seen' => now(),
+                    'updated_at' => now()
+                ]);
+
+            // Get current flags
+            $deviceStatus = DB::table('device_status')->where('station_id', $stationId)->first();
+            $configUpdate = DB::table('device_configurations')->where('station_id', $stationId)->first();
+
+            // Create heartbeat response
+            $response = [
+                'station_id' => $stationId,
+                'api_key' => $apiKey,
+                'task' => 'heartbeat',
+                'message' => 'RECEIVED',
+                'success' => true,
+                'reply' => [
+                    'current_time' => time(),
+                    'request_update' => (bool) ($deviceStatus->request_update ?? false),
+                    'configuration_update' => (bool) ($configUpdate->configuration_update ?? false)
+                ]
+            ];
+
+            Log::debug("Heartbeat processed for device: {$stationId}");
+            return $response;
+
+        } catch (\Exception $e) {
+            Log::error("Heartbeat error: " . $e->getMessage());
+            return $this->createErrorResponse($stationId ?? '', $apiKey ?? '', 'heartbeat', 'Internal server error');
+        }
+    }
+
+    /**
+     * Handle configuration request from ESP32
+     */
+    public function handleConfigRequest(array $payload): array
+    {
+        try {
+            $stationId = $payload['station_id'] ?? null;
+            $apiKey = $payload['api_key'] ?? null;
+            $task = $payload['task'] ?? null;
+            $message = $payload['message'] ?? null;
+            $params = $payload['params'] ?? [];
+
+            if (!$stationId || !$apiKey || $task !== 'Configuration Update' || $message !== 'SEND') {
+                return $this->createErrorResponse($stationId, $apiKey, 'Configuration Update', 'Invalid payload format');
+            }
+
+            $deviceConfig = $this->authenticateDevice($stationId, $apiKey);
+            if (!$deviceConfig) {
+                return $this->createErrorResponse($stationId, $apiKey, 'Configuration Update', 'Invalid device credentials');
+            }
+
+            // Update configuration_update status
+            if (isset($params['configuration_update']) && $params['configuration_update'] === 'false') {
+                DB::table('device_configurations')
+                    ->where('station_id', $stationId)
+                    ->update([
+                        'configuration_update' => false,
+                        'updated_at' => now()
+                    ]);
+            }
+
+            // Get current configuration
+            $config = DB::table('device_configurations')->where('station_id', $stationId)->first();
+
+            // Create configuration response
+            $response = [
+                'station_id' => $stationId,
+                'api_key' => $apiKey,
+                'task' => 'Configuration Update',
+                'message' => 'RECEIVED',
+                'reply' => [
+                    'success' => true,
+                    'data_collection_time' => $config->data_collection_time ?? 30,
+                    'data_interval' => $config->data_interval ?? 3
+                ]
+            ];
+
+            Log::debug("Configuration update processed for device: {$stationId}");
+            return $response;
+
+        } catch (\Exception $e) {
+            Log::error("Config request error: " . $e->getMessage());
+            return $this->createErrorResponse($stationId ?? '', $apiKey ?? '', 'Configuration Update', 'Internal server error');
+        }
+    }
+
+    /**
+     * Handle data upload request from ESP32
+     */
+    public function handleDataUpload(array $payload): array
+    {
+        try {
+            $stationId = $payload['station_id'] ?? null;
+            $apiKey = $payload['api_key'] ?? null;
+            $task = $payload['task'] ?? null;
+            $message = $payload['message'] ?? null;
+            $params = $payload['params'] ?? [];
+
+            if (!$stationId || !$apiKey || $task !== 'Upload Data' || $message !== 'SEND') {
+                return $this->createErrorResponse($stationId, $apiKey, 'Upload Data', 'Invalid payload format');
+            }
+
+            $deviceConfig = $this->authenticateDevice($stationId, $apiKey);
+            if (!$deviceConfig) {
+                return $this->createErrorResponse($stationId, $apiKey, 'Upload Data', 'Invalid device credentials');
+            }
+
+            // Save sensor reading (using station_id instead of device_id)
+            DB::table('sensor_readings')->insert([
+                'station_id' => $stationId,
+                'temperature' => $params['temperature'] ?? null,
+                'humidity' => $params['humidity'] ?? null,
+                'rssi' => $params['rssi'] ?? null,
+                'battery_voltage' => $params['battery_voltage'] ?? null,
+                'reading_time' => now(),
+                'web_triggered' => false,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            // Update device status
+            DB::table('device_status')
+                ->where('station_id', $stationId)
+                ->update([
+                    'request_update' => isset($params['update_request']) ? (bool) $params['update_request'] : false,
+                    'last_seen' => now(),
+                    'status' => 'online',
+                    'updated_at' => now()
+                ]);
+
+            // Create data upload response
+            $response = [
+                'station_id' => $stationId,
+                'api_key' => $apiKey,
+                'task' => 'Upload Data',
+                'message' => 'RECEIVED',
+                'reply' => [
+                    'success' => true
+                ]
+            ];
+
+            Log::debug("Data upload processed for device: {$stationId}");
+            return $response;
+
+        } catch (\Exception $e) {
+            Log::error("Data upload error: " . $e->getMessage());
+            return $this->createErrorResponse($stationId ?? '', $apiKey ?? '', 'Upload Data', 'Internal server error');
+        }
+    }
+
+    /**
+     * Publish message to MQTT broker
+     */
+    public function publishToMqtt(string $topic, array $payload): bool
+    {
+        return $this->publish($topic, json_encode($payload), 1);
+    }
+
+    /**
+     * Publish message to topic
+     */
+    public function publish(string $topic, string $message, int $qos = 0): bool
+    {
+        try {
+            if (!$this->isConnected && !$this->connect()) {
+                return false;
+            }
+
+            $this->client->publish($topic, $message, $qos);
+            
+            Log::debug('MQTT message published', [
+                'topic' => $topic,
+                'message_length' => strlen($message),
+                'qos' => $qos
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('MQTT publish failed: ' . $e->getMessage(), [
+                'topic' => $topic,
+                'message' => $message
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Request manual data update from device
+     */
+    public function requestDataUpdate(string $stationId): bool
+    {
+        try {
+            $exists = DB::table('station_information')->where('station_id', $stationId)->exists();
+            if (!$exists) {
+                return false;
+            }
+
+            // Set request_update flag
+            DB::table('device_status')
+                ->where('station_id', $stationId)
+                ->update([
+                    'request_update' => true,
+                    'updated_at' => now()
+                ]);
+
+            Log::debug("Data update requested for device: {$stationId}");
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Request data update error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Request configuration update from device
+     */
+    public function requestConfigUpdate(string $stationId): bool
+    {
+        try {
+            $exists = DB::table('station_information')->where('station_id', $stationId)->exists();
+            if (!$exists) {
+                return false;
+            }
+
+            // Set configuration_update flag
+            DB::table('device_configurations')
+                ->where('station_id', $stationId)
+                ->update([
+                    'configuration_update' => true,
+                    'updated_at' => now()
+                ]);
+
+            Log::debug("Configuration update requested for device: {$stationId}");
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Request config update error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Authenticate device using station_id and api_key
+     */
+    protected function authenticateDevice(string $stationId, string $apiKey): ?object
+    {
+        return DB::table('device_configurations as dc')
+            ->join('station_information as si', 'dc.station_id', '=', 'si.station_id')
+            ->where('dc.station_id', $stationId)
+            ->where('dc.api_token', $apiKey)
+            ->where('si.station_active', true)
+            ->select('dc.*', 'si.station_active')
+            ->first();
+    }
+
+    /**
+     * Create error response
+     */
+    protected function createErrorResponse(string $stationId, string $apiKey, string $task, string $error): array
+    {
+        return [
+            'station_id' => $stationId,
+            'api_key' => $apiKey,
+            'task' => $task,
+            'message' => 'ERROR',
+            'success' => false,
+            'error' => $error
+        ];
+    }
+
+    /**
+     * Parse MQTT topic to extract station_id and action
+     */
+    public function parseMqttTopic(string $topic): array
+    {
+        // Topic format: iot/{station_id}/{action}/{type}
+        // Example: iot/KL001/heartbeat/request
+        $parts = explode('/', $topic);
+        
+        if (count($parts) !== 4 || $parts[0] !== 'iot') {
+            return ['station_id' => null, 'action' => null, 'type' => null];
+        }
+
+        return [
+            'station_id' => $parts[1],
+            'action' => $parts[2],
+            'type' => $parts[3]
+        ];
+    }
+
+    /**
+     * Generate MQTT topic for response
+     */
+    public function generateResponseTopic(string $stationId, string $action): string
+    {
+        return "iot/{$stationId}/{$action}/response";
     }
 }

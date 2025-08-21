@@ -127,6 +127,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'mqtt' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/mqtt.log'),
+            'level' => env('LOG_LEVEL', 'warning'), // Only log warnings and errors
+            'days' => env('LOG_DAILY_DAYS', 7), // Keep only 7 days
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

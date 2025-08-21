@@ -6,9 +6,9 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1><i class="fas fa-users me-2"></i>User Management</h1>
-                <a href="{{ route('users.create') }}" class="btn btn-primary">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
                     <i class="fas fa-plus me-1"></i>Add New User
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -103,12 +103,13 @@
                                                     </button>
                                                     
                                                     <!-- Edit User Button -->
-                                                    <a href="{{ route('users.edit', $user) }}" class="btn btn-outline-warning btn-icon" 
-                                                       data-bs-toggle="tooltip" 
-                                                       data-bs-placement="top" 
-                                                       title="Edit User">
+                                                    <button type="button" class="btn btn-outline-warning btn-icon" 
+                                                            onclick="editUserProfile({{ $user->id }})"
+                                                            data-bs-toggle="tooltip" 
+                                                            data-bs-placement="top" 
+                                                            title="Edit User">
                                                         <i class="fas fa-edit"></i>
-                                                    </a>
+                                                    </button>
                                                     
                                                     <!-- Delete User Button (not for current user) -->
                                                     @if($user->id !== auth()->id())
@@ -137,13 +138,100 @@
                             <i class="fas fa-users fa-3x text-muted mb-3"></i>
                             <h5 class="text-muted">No users found</h5>
                             <p class="text-muted">Start by adding your first user.</p>
-                            <a href="{{ route('users.create') }}" class="btn btn-primary">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
                                 <i class="fas fa-plus me-1"></i>Add First User
-                            </a>
+                            </button>
                         </div>
                     @endif
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Add New User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addUserForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="addName" class="form-label">Full Name <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                    <input type="text" class="form-control" id="addName" name="name" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="addEmail" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <input type="email" class="form-control" id="addEmail" name="email" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="addRole" class="form-label">User Role <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-user-shield"></i></span>
+                                    <select class="form-select" id="addRole" name="role" required>
+                                        <option value="">Choose role...</option>
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                                <small class="form-text text-muted">Admin: Full access | User: Dashboard & Devices only</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    <h6 class="text-muted mb-3"><i class="fas fa-lock me-1"></i>Password Settings</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="addPassword" class="form-label">Password <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" class="form-control" id="addPassword" name="password" required>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordField('addPassword')">
+                                        <i class="fas fa-eye" id="addPassword-toggle"></i>
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">Minimum 8 characters required.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="addPasswordConfirm" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" class="form-control" id="addPasswordConfirm" name="password_confirmation" required>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordField('addPasswordConfirm')">
+                                        <i class="fas fa-eye" id="addPasswordConfirm-toggle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-1"></i>Create User
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -217,6 +305,76 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editUserForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editName" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="editName" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editEmail" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="editEmail" name="email" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editRole" class="form-label">Role</label>
+                                <select class="form-control" id="editRole" name="role" required>
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    <h6 class="text-muted mb-3"><i class="fas fa-lock me-1"></i>Password Changes (Optional)</h6>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="editCurrentPassword" class="form-label">Current Password</label>
+                                <input type="password" class="form-control" id="editCurrentPassword" name="current_password">
+                                <small class="text-muted">Enter current password to change password</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editPassword" class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="editPassword" name="password">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editPasswordConfirm" class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="editPasswordConfirm" name="password_confirmation">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save me-1"></i>Save Changes
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -379,6 +537,38 @@ function showUserProfile(userId) {
         });
 }
 
+function editUserProfile(userId) {
+    // Show edit modal
+    const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    modal.show();
+    
+    // Fetch user data to populate form
+    fetch(`/api/users/${userId}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
+        .then(response => response.json())
+        .then(user => {
+            document.getElementById('editName').value = user.name;
+            document.getElementById('editEmail').value = user.email;
+            document.getElementById('editRole').value = user.role;
+            document.getElementById('editCurrentPassword').value = '';
+            document.getElementById('editPassword').value = '';
+            document.getElementById('editPasswordConfirm').value = '';
+            
+            // Store user ID for form submission
+            document.getElementById('editUserForm').dataset.userId = userId;
+        })
+        .catch(error => {
+            console.error('Error fetching user data:', error);
+            alert('Error loading user data. Please try again.');
+            modal.hide();
+        });
+}
+
 function getTimeAgo(date) {
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
@@ -389,6 +579,21 @@ function getTimeAgo(date) {
     if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
     if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`;
     return `${Math.floor(diffInSeconds / 31536000)} years ago`;
+}
+
+function togglePasswordField(fieldId) {
+    const field = document.getElementById(fieldId);
+    const toggle = document.getElementById(fieldId + '-toggle');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        toggle.classList.remove('fa-eye');
+        toggle.classList.add('fa-eye-slash');
+    } else {
+        field.type = 'password';
+        toggle.classList.remove('fa-eye-slash');
+        toggle.classList.add('fa-eye');
+    }
 }
 
 // Initialize tooltips and DataTable
@@ -409,6 +614,113 @@ $(document).ready(function() {
             ]
         });
     }
+    
+    // Handle add user form submission
+    $('#addUserForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        // Convert to JSON
+        const data = {};
+        formData.forEach((value, key) => {
+            data[key] = value;
+        });
+        
+        // Validate password confirmation
+        if (data.password !== data.password_confirmation) {
+            alert('Password confirmation does not match!');
+            return;
+        }
+        
+        fetch('/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('User created successfully!');
+                bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+                location.reload(); // Reload to show the new user
+            } else {
+                alert('Error creating user: ' + (result.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error creating user:', error);
+            alert('Error creating user. Please try again.');
+        });
+    });
+    
+    // Handle edit user form submission
+    $('#editUserForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const userId = this.dataset.userId;
+        const formData = new FormData(this);
+        
+        // Convert to JSON
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === 'password' && value === '') {
+                // Skip empty password
+                return;
+            }
+            if (key === 'password_confirmation' && value === '') {
+                // Skip empty password confirmation
+                return;
+            }
+            if (key === 'current_password' && value === '') {
+                // Skip empty current password
+                return;
+            }
+            data[key] = value;
+        });
+        
+        // Validate password fields if password is provided
+        if (data.password) {
+            if (!data.current_password) {
+                alert('Current password is required to change password!');
+                return;
+            }
+            if (data.password_confirmation && data.password !== data.password_confirmation) {
+                alert('Password confirmation does not match!');
+                return;
+            }
+        }
+        
+        fetch(`/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('User updated successfully!');
+                location.reload(); // Reload to show changes
+            } else {
+                alert('Error updating user: ' + (result.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error updating user:', error);
+            alert('Error updating user. Please try again.');
+        });
+    });
+    
+    // Clear add user form when modal is hidden
+    $('#addUserModal').on('hidden.bs.modal', function() {
+        document.getElementById('addUserForm').reset();
+    });
 });
 </script>
 @endpush
