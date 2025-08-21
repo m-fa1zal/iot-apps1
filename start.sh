@@ -15,7 +15,7 @@ php artisan config:clear
 php artisan config:cache
 
 # Check service type and start appropriate service
-if [ "$RAILWAY_SERVICE_NAME" = "iot-apps1" ]; then
+if [ "$RAILWAY_SERVICE_NAME" = "mqtt" ]; then
     echo "📡 Starting MQTT listener..."
     exec php artisan mqtt:listen
 else
