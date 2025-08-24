@@ -43,10 +43,12 @@ class MqttService
             ->setConnectTimeout(30)
             ->setSocketTimeout(30)
             ->setResendTimeout(10)
-            ->setUseTls(true)                    // Enable TLS/SSL
+            ->setUseTls(true)                    // Enable TLS/SSL for Railway
             ->setTlsSelfSignedAllowed(true)      // Allow self-signed certificates
             ->setTlsVerifyPeer(false)            // Don't verify peer certificate
-            ->setTlsVerifyPeerName(false);       // Don't verify peer name
+            ->setTlsVerifyPeerName(false)        // Don't verify peer name
+            ->setTlsClientCertificateFile(null)  // No client certificate
+            ->setTlsClientCertificateKeyFile(null); // No client key
             
         if (!empty($this->mqtt_username)) {
             $this->connectionSettings

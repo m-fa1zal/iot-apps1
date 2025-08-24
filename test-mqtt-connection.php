@@ -9,11 +9,18 @@ echo "===============================\n";
 echo "Railway MQTT Connection Test\n";
 echo "===============================\n\n";
 
-// MQTT connection details
-$host = $_ENV['MQTT_HOST'] ?? 'maglev.proxy.rlwy.net';
-$port = intval($_ENV['MQTT_PORT'] ?? 49225);
-$username = $_ENV['MQTT_USERNAME'] ?? 'root';
-$password = $_ENV['MQTT_PASSWORD'] ?? '';
+// MQTT connection details - Railway Mosquitto template
+$host = 'maglev.proxy.rlwy.net';
+$port = 49225;
+$username = $_ENV['MOSQUITTO_USERNAME'] ?? '';
+$password = $_ENV['MOSQUITTO_PASSWORD'] ?? '';
+
+// Use correct Railway credentials  
+if (empty($username)) {
+    echo "Using correct Railway credentials...\n";
+    $username = 'iot-apps1';
+    $password = '0wk5cr8jvezzhv2qmqlf3vh1eumc4uek';
+}
 $clientId = 'test_client_' . uniqid();
 
 echo "Connection Details:\n";
@@ -37,44 +44,62 @@ if ($socket) {
 // Test 2: MQTT Client connection
 echo "\n2. Testing MQTT client connection...\n";
 try {
-    $client = new MqttClient($host, $port, $clientId);
+    $client = new MqttClient($host, $port, $clientId, MqttClient::MQTT_3_1_1);
     
-    // Try TLS connection settings for Railway's MQTT broker
-    $connectionSettings = (new ConnectionSettings())
-        ->setKeepAliveInterval(60)
-        ->setConnectTimeout(30)
-        ->setSocketTimeout(30)
-        ->setResendTimeout(10)
-        ->setUseTls(true)                    // Enable TLS/SSL
-        ->setTlsSelfSignedAllowed(true)      // Allow self-signed certificates
-        ->setTlsVerifyPeer(false)            // Don't verify peer certificate
-        ->setTlsVerifyPeerName(false);       // Don't verify peer name
+    // Only try without TLS (matching disabled TLS in MqttService.php)
+    $tlsConfigs = [
+        'no_tls' => false
+    ];
     
-    echo "   TLS/SSL enabled with relaxed certificate verification\n";
+    $connectionSettings = null;
+    $success = false;
     
-    if (!empty($username)) {
-        echo "   Setting username: '$username'\n";
-        echo "   Setting password: '" . substr($password, 0, 5) . "...'\n";
-        $connectionSettings
-            ->setUsername($username)
-            ->setPassword($password);
-    }
-    
-    echo "   Connection settings configured\n";
-    
-    echo "   Attempting MQTT connection with clean session=true...\n";
-    try {
-        $client->connect($connectionSettings, true);
-        echo "   ✅ MQTT connection successful!\n";
-    } catch (Exception $e1) {
-        echo "   ❌ Clean session=true failed: " . $e1->getMessage() . "\n";
-        echo "   Trying with clean session=false...\n";
+    foreach ($tlsConfigs as $configName => $useTls) {
+        echo "   Trying connection: $configName...\n";
         
-        // Try without clean session
-        $client = new MqttClient($host, $port, $clientId);
-        $client->connect($connectionSettings, false);
-        echo "   ✅ MQTT connection successful with clean session=false!\n";
+        $connectionSettings = (new ConnectionSettings())
+            ->setKeepAliveInterval(60)
+            ->setConnectTimeout(30)
+            ->setSocketTimeout(30)
+            ->setResendTimeout(10)
+            ->setUseTls($useTls);
+            
+        if ($useTls) {
+            $connectionSettings
+                ->setTlsVerifyPeer(false)
+                ->setTlsVerifyPeerName(false)
+                ->setTlsSelfSignedAllowed(true);
+        }
+        
+        echo "   TLS: " . ($useTls ? 'enabled' : 'disabled') . "\n";
+        
+        if (!empty($username)) {
+            echo "   Setting auth: username='$username'\n";
+            $connectionSettings
+                ->setUsername($username)
+                ->setPassword($password);
+        } else {
+            echo "   Using anonymous connection\n";
+        }
+        
+        try {
+            $testClient = new MqttClient($host, $port, $clientId . '_' . $configName, MqttClient::MQTT_3_1_1);
+            $testClient->connect($connectionSettings, true);
+            echo "   ✅ Connection successful with $configName!\n";
+            $client = $testClient;
+            $success = true;
+            break;
+        } catch (Exception $e) {
+            echo "   ❌ $configName failed: " . $e->getMessage() . "\n";
+        }
     }
+    
+    if (!$success) {
+        throw new Exception("All connection attempts failed");
+    }
+    
+    echo "   Using username: '$username'\n";
+    echo "   Using password: '" . substr($password, 0, 5) . "...'\n";
     
     // Test 3: Subscribe to test topic
     echo "\n3. Testing topic subscription...\n";
