@@ -9,25 +9,18 @@ echo "===============================\n";
 echo "Railway MQTT Connection Test\n";
 echo "===============================\n\n";
 
-// MQTT connection details - Railway Mosquitto template
+// MQTT connection details - exact mosquitto_sub parameters
 $host = 'maglev.proxy.rlwy.net';
 $port = 49225;
-$username = $_ENV['MOSQUITTO_USERNAME'] ?? '';
-$password = $_ENV['MOSQUITTO_PASSWORD'] ?? '';
-
-// Use correct Railway credentials  
-if (empty($username)) {
-    echo "Using correct Railway credentials...\n";
-    $username = 'iot-apps1';
-    $password = '0wk5cr8jvezzhv2qmqlf3vh1eumc4uek';
-}
+$username = 'iot-apps1';
+$password = '0wk5cr8jvezzhv2qmqlf3vh1eumc4uek';
 $clientId = 'test_client_' . uniqid();
 
 echo "Connection Details:\n";
 echo "Host: $host\n";
 echo "Port: $port\n";
 echo "Username: $username\n";
-echo "Password: " . (empty($password) ? 'NOT SET' : '***SET***') . "\n";
+echo "Password: ***SET***\n";
 echo "Client ID: $clientId\n\n";
 
 // Test 1: Basic socket connection
@@ -46,60 +39,18 @@ echo "\n2. Testing MQTT client connection...\n";
 try {
     $client = new MqttClient($host, $port, $clientId, MqttClient::MQTT_3_1_1);
     
-    // Only try without TLS (matching disabled TLS in MqttService.php)
-    $tlsConfigs = [
-        'no_tls' => false
-    ];
+    // Exact same settings as mosquitto_sub
+    $connectionSettings = (new ConnectionSettings())
+        ->setKeepAliveInterval(60)
+        ->setConnectTimeout(60)
+        ->setSocketTimeout(60)
+        ->setUseTls(false)
+        ->setUsername($username)
+        ->setPassword($password);
     
-    $connectionSettings = null;
-    $success = false;
-    
-    foreach ($tlsConfigs as $configName => $useTls) {
-        echo "   Trying connection: $configName...\n";
-        
-        $connectionSettings = (new ConnectionSettings())
-            ->setKeepAliveInterval(60)
-            ->setConnectTimeout(30)
-            ->setSocketTimeout(30)
-            ->setResendTimeout(10)
-            ->setUseTls($useTls);
-            
-        if ($useTls) {
-            $connectionSettings
-                ->setTlsVerifyPeer(false)
-                ->setTlsVerifyPeerName(false)
-                ->setTlsSelfSignedAllowed(true);
-        }
-        
-        echo "   TLS: " . ($useTls ? 'enabled' : 'disabled') . "\n";
-        
-        if (!empty($username)) {
-            echo "   Setting auth: username='$username'\n";
-            $connectionSettings
-                ->setUsername($username)
-                ->setPassword($password);
-        } else {
-            echo "   Using anonymous connection\n";
-        }
-        
-        try {
-            $testClient = new MqttClient($host, $port, $clientId . '_' . $configName, MqttClient::MQTT_3_1_1);
-            $testClient->connect($connectionSettings, true);
-            echo "   ✅ Connection successful with $configName!\n";
-            $client = $testClient;
-            $success = true;
-            break;
-        } catch (Exception $e) {
-            echo "   ❌ $configName failed: " . $e->getMessage() . "\n";
-        }
-    }
-    
-    if (!$success) {
-        throw new Exception("All connection attempts failed");
-    }
-    
-    echo "   Using username: '$username'\n";
-    echo "   Using password: '" . substr($password, 0, 5) . "...'\n";
+    echo "   Connecting with mosquitto_sub compatible settings...\n";
+    $client->connect($connectionSettings, true);
+    echo "   ✅ MQTT connection successful!\n";
     
     // Test 3: Subscribe to test topic
     echo "\n3. Testing topic subscription...\n";
@@ -128,15 +79,6 @@ try {
     echo "   ❌ MQTT connection failed:\n";
     echo "   Error: " . $e->getMessage() . "\n";
     echo "   Code: " . $e->getCode() . "\n";
-    echo "   File: " . $e->getFile() . ":" . $e->getLine() . "\n";
-    
-    if (method_exists($e, 'getPrevious') && $e->getPrevious()) {
-        $prev = $e->getPrevious();
-        echo "   Previous: " . $prev->getMessage() . "\n";
-    }
-    
-    echo "\n   Stack trace:\n";
-    echo $e->getTraceAsString() . "\n";
     
     exit(1);
 }
