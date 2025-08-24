@@ -34,21 +34,16 @@ class MqttService
      */
     private function initializeClient()
     {
-        $clientId = config('mqtt.client_id', 'laravel_iot_' . uniqid());
+        $clientId = config('mqtt.client_id', 'laravel_iot') . '_' . uniqid();
         
-        $this->client = new MqttClient($this->mqtt_host, $this->mqtt_port, $clientId);
+        $this->client = new MqttClient($this->mqtt_host, $this->mqtt_port, $clientId, MqttClient::MQTT_3_1_1);
         
         $this->connectionSettings = (new ConnectionSettings())
             ->setKeepAliveInterval(60)
-            ->setConnectTimeout(30)
-            ->setSocketTimeout(30)
+            ->setConnectTimeout(60)
+            ->setSocketTimeout(60)
             ->setResendTimeout(10)
-            ->setUseTls(true)                    // Enable TLS/SSL for Railway
-            ->setTlsSelfSignedAllowed(true)      // Allow self-signed certificates
-            ->setTlsVerifyPeer(false)            // Don't verify peer certificate
-            ->setTlsVerifyPeerName(false)        // Don't verify peer name
-            ->setTlsClientCertificateFile(null)  // No client certificate
-            ->setTlsClientCertificateKeyFile(null); // No client key
+            ->setUseTls(false);                  // Disable TLS/SSL - matches mosquitto_sub
             
         if (!empty($this->mqtt_username)) {
             $this->connectionSettings
