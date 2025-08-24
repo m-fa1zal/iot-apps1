@@ -22,7 +22,6 @@ class UserSeeder extends Seeder
                 'email' => 'admin@iot-apps.local',
                 'password' => Hash::make('password123'),
                 'role' => 'admin',
-                'email_verified_at' => now(),
             ]
         );
 
@@ -34,7 +33,6 @@ class UserSeeder extends Seeder
                 'email' => 'test@iot-apps.local',
                 'password' => Hash::make('password123'),
                 'role' => 'user',
-                'email_verified_at' => now(),
             ]
         );
 
@@ -46,7 +44,6 @@ class UserSeeder extends Seeder
                 'email' => 'demo@iot-apps.local',
                 'password' => Hash::make('password123'),
                 'role' => 'user',
-                'email_verified_at' => now(),
             ]
         );
 
