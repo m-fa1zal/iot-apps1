@@ -118,9 +118,10 @@ class MqttListenerCommand extends Command
      */
     private function handleMqttMessage(string $topic, string $payload)
     {
-        $this->info("Received message on topic: {$topic}");
-        // Only log errors and warnings, not every message
-        Log::debug("MQTT message received", ['topic' => $topic, 'payload_length' => strlen($payload)]);
+        // Reduced logging - only show processing, not every received message
+        // Log::debug("MQTT message received", ['topic' => $topic, 'payload_length' => strlen($payload)]);
+        
+        $requestStartTime = microtime(true); // Start timing
 
         try {
             $data = json_decode($payload, true);
@@ -135,7 +136,7 @@ class MqttListenerCommand extends Command
             $action = $topicParts['action'];
             $type = $topicParts['type'];
 
-            $this->info("Processing: {$stationId}/{$action}/{$type}");
+            // $this->info("Processing: {$stationId}/{$action}/{$type}"); // Reduced console output
 
             if ($type !== 'request') {
                 $this->info("Ignoring non-request message");
@@ -173,7 +174,14 @@ class MqttListenerCommand extends Command
                     $responseTopic = $this->mqttService->generateResponseTopic($stationId, $action);
                     $publishResult = $this->mqttService->publishToMqtt($responseTopic, $response);
                     
-                    if (!$publishResult) {
+                    if ($publishResult) {
+                        // Calculate response time
+                        $responseTime = round((microtime(true) - $requestStartTime) * 1000); // Convert to milliseconds
+                        
+                        // Log successful response using message field from response
+                        $responseStatus = ($response['message'] === 'RECEIVED') ? 'RECEIVE' : 'SEND'; // Map RECEIVED->RECEIVE
+                        $this->mqttService->logMqttTask($stationId, $responseTopic, $action, 'response', $responseStatus, $responseTime);
+                    } else {
                         $this->warn("Failed to publish response for {$action} from {$stationId}");
                     }
                 } else {

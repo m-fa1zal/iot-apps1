@@ -153,6 +153,10 @@ class MqttService
                 return $this->createErrorResponse($stationId, $apiKey, 'heartbeat', 'Invalid device credentials');
             }
 
+            // Log MQTT task based on message field
+            $status = ($message === 'SEND') ? 'SEND' : 'RECEIVE'; // Map SEND->SEND, RECEIVED->RECEIVE
+            $this->logMqttTask($stationId, 'iot/' . $stationId . '/heartbeat/request', 'heartbeat', 'request', $status);
+
             // Update device status and last seen
             DB::table('device_status')
                 ->where('station_id', $stationId)
@@ -174,7 +178,7 @@ class MqttService
                 'message' => 'RECEIVED',
                 'success' => true,
                 'reply' => [
-                    'current_time' => time(),
+                    'current_time' => now()->addHours(8)->timestamp,
                     'request_update' => (bool) ($deviceStatus->request_update ?? false),
                     'configuration_update' => (bool) ($configUpdate->configuration_update ?? false)
                 ]
@@ -209,6 +213,10 @@ class MqttService
             if (!$deviceConfig) {
                 return $this->createErrorResponse($stationId, $apiKey, 'Configuration Update', 'Invalid device credentials');
             }
+
+            // Log MQTT task based on message field
+            $status = ($message === 'SEND') ? 'SEND' : 'RECEIVE'; // Map SEND->SEND, RECEIVED->RECEIVE
+            $this->logMqttTask($stationId, 'iot/' . $stationId . '/config/request', 'configuration_update', 'request', $status);
 
             // Update configuration_update status
             if (isset($params['configuration_update']) && $params['configuration_update'] === 'false') {
@@ -265,6 +273,10 @@ class MqttService
             if (!$deviceConfig) {
                 return $this->createErrorResponse($stationId, $apiKey, 'Upload Data', 'Invalid device credentials');
             }
+
+            // Log MQTT task based on message field
+            $status = ($message === 'SEND') ? 'SEND' : 'RECEIVE'; // Map SEND->SEND, RECEIVED->RECEIVE
+            $this->logMqttTask($stationId, 'iot/' . $stationId . '/data/request', 'data_upload', 'request', $status);
 
             // Save sensor reading (using station_id instead of device_id)
             DB::table('sensor_readings')->insert([
@@ -454,5 +466,36 @@ class MqttService
     public function generateResponseTopic(string $stationId, string $action): string
     {
         return "iot/{$stationId}/{$action}/response";
+    }
+
+    /**
+     * Log MQTT task to database
+     */
+    public function logMqttTask(string $stationId, string $topic, string $taskType, string $direction, string $status, ?int $responseTimeMs = null): void
+    {
+        try {
+            $data = [
+                'station_id' => $stationId,
+                'topic' => $topic,
+                'task_type' => $taskType,
+                'direction' => $direction,
+                'status' => $status,
+                'received_at' => now()
+            ];
+
+            if ($direction === 'response') {
+                $data['processed_at'] = now();
+                $data['response_time_ms'] = $responseTimeMs;
+            }
+
+            DB::table('mqtt_task_logs')->insert($data);
+        } catch (\Exception $e) {
+            Log::error("Failed to log MQTT task", [
+                'station_id' => $stationId,
+                'topic' => $topic,
+                'task_type' => $taskType,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 }

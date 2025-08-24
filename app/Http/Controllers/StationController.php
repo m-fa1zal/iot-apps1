@@ -485,7 +485,7 @@ class StationController extends Controller
                 'task_type' => $log->task_type ?? 'N/A',
                 'status' => $log->status ?? 'N/A',
                 'message' => $log->topic ?? 'N/A',
-                'response_time' => null, // Not in current table structure
+                'response_time_ms' => $log->response_time_ms ?? null,
                 'direction' => $log->direction ?? 'N/A',
                 'created_at' => $log->created_at ?? null,
             ];

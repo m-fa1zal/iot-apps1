@@ -5,7 +5,7 @@ This document provides instructions for testing the ESP32 config API endpoint us
 
 ## Base URL
 ```
-http://localhost:8080/api
+https://localhost:8080/api
 ```
 
 ## Endpoints
@@ -85,7 +85,7 @@ Authorization: Bearer {api_token}
 1. Open Postman
 2. Create a new request
 3. Set method to `POST`
-4. Set URL to: `http://localhost:8080/api/config`
+4. Set URL to: `https://localhost:8080/api/config`
 
 ### Test Case 1: Valid API Token (Bearer)
 
@@ -110,7 +110,7 @@ Authorization: Bearer [YOUR_ACTUAL_API_TOKEN_HERE]
 - Note the `updateRequest` value (should be `false`)
 
 #### Step 2: Trigger Update Request from Dashboard
-- Open web dashboard: `http://localhost:8080/dashboard`
+- Open web dashboard: `https://localhost:8080/dashboard`
 - Login with admin credentials
 - Click "Request Data" button on any station card
 - This sets `request_update = true` in database
@@ -164,7 +164,7 @@ Content-Type: application/json
 To get valid API tokens for testing, you can:
 
 1. **Via Web Dashboard:**
-   - Login to dashboard: `http://localhost:8080/dashboard`
+   - Login to dashboard: `https://localhost:8080/dashboard`
    - Go to Devices section
    - View any device details
    - Copy the API token from device information
@@ -186,7 +186,7 @@ To get valid API tokens for testing, you can:
 **To get valid API tokens:**
 
 1. **Via Web Dashboard (Recommended):**
-   - Visit: `http://localhost:8080/dashboard` 
+   - Visit: `https://localhost:8080/dashboard` 
    - Login with: `admin@iot-apps.local` / `password123`
    - Go to "Devices" section
    - Click "View Details" on any device
@@ -234,7 +234,7 @@ Token: [64-character unique string from database]
 
 #### Setup
 1. Set method to `POST`
-2. Set URL to: `http://localhost:8080/api/upload`
+2. Set URL to: `https://localhost:8080/api/upload`
 
 #### Headers
 ```

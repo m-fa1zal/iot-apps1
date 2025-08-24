@@ -2357,12 +2357,14 @@ function populateTaskLogTable(logs) {
             <td>${log.station_id}</td>
             <td>${log.task_type || 'N/A'}</td>
             <td>
-                ${log.status === 'success' ? '<span class="badge bg-success">Success</span>' : 
+                ${log.status === 'SEND' ? '<span class="badge bg-primary">SEND</span>' : 
+                  log.status === 'RECEIVE' ? '<span class="badge bg-success">RECEIVE</span>' :
+                  log.status === 'success' ? '<span class="badge bg-success">Success</span>' : 
                   log.status === 'failed' ? '<span class="badge bg-danger">Failed</span>' : 
-                  '<span class="badge bg-warning">Pending</span>'}
+                  '<span class="badge bg-warning">' + log.status + '</span>'}
             </td>
             <td>${log.message || 'N/A'}</td>
-            <td>${log.response_time !== null ? log.response_time + ' ms' : 'N/A'}</td>
+            <td>${log.response_time_ms !== null ? log.response_time_ms + ' ms' : 'N/A'}</td>
         </tr>
     `).join('');
 }
