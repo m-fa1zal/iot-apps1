@@ -53,6 +53,10 @@ else
     echo "⚠️ netcat not available for connection testing"
 fi
 
+# Run MQTT connection test first
+echo "Running MQTT connection test..."
+php test-mqtt-connection.php
+
 # 2. Start Laravel MQTT Listener (connects to Railway's MQTT broker)
 echo "[2/2] Starting Laravel MQTT Listener..."
 echo "MQTT Config: ${MQTT_HOST:-not_set}:${MQTT_PORT:-not_set}"
