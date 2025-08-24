@@ -16,6 +16,12 @@ cleanup() {
 # Trap signals for graceful shutdown
 trap cleanup SIGTERM SIGINT
 
+# Laravel optimization commands for production
+echo "Optimizing Laravel for production..."
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
 # Start all services simultaneously in background
 echo "Starting all services simultaneously..."
 
