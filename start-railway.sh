@@ -16,6 +16,18 @@ cleanup() {
 # Trap signals for graceful shutdown
 trap cleanup SIGTERM SIGINT
 
+# Database setup for Railway deployment
+echo "Setting up database..."
+php artisan migrate --force
+
+# Check if database is empty and seed if needed
+if [ "$(php artisan tinker --execute="echo \Illuminate\Support\Facades\DB::table('users')->count();")" = "0" ]; then
+    echo "Database is empty, running seeders..."
+    php artisan db:seed --force
+else
+    echo "Database already seeded, skipping seeders..."
+fi
+
 # Laravel optimization commands for production
 echo "Optimizing Laravel for production..."
 php artisan config:cache
