@@ -39,7 +39,10 @@ class MqttService
         $this->client = new MqttClient($this->mqtt_host, $this->mqtt_port, $clientId);
         
         $this->connectionSettings = (new ConnectionSettings())
-            ->setKeepAliveInterval(60);
+            ->setKeepAliveInterval(60)
+            ->setConnectTimeout(30)
+            ->setSocketTimeout(30)
+            ->setResendTimeout(10);
             
         if (!empty($this->mqtt_username)) {
             $this->connectionSettings
@@ -55,13 +58,22 @@ class MqttService
     {
         try {
             if (!$this->isConnected) {
+                Log::info('Attempting MQTT connection to ' . $this->mqtt_host . ':' . $this->mqtt_port);
+                Log::info('Using username: ' . ($this->mqtt_username ?: 'none'));
+                
                 $this->client->connect($this->connectionSettings, true);
                 $this->isConnected = true;
                 Log::info('MQTT Service connected successfully to ' . $this->mqtt_host . ':' . $this->mqtt_port);
             }
             return true;
         } catch (\Exception $e) {
-            Log::error('MQTT connection failed: ' . $e->getMessage());
+            Log::error('MQTT connection failed', [
+                'host' => $this->mqtt_host,
+                'port' => $this->mqtt_port,
+                'username' => $this->mqtt_username,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return false;
         }
     }
