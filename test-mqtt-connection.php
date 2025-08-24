@@ -39,21 +39,38 @@ echo "\n2. Testing MQTT client connection...\n";
 try {
     $client = new MqttClient($host, $port, $clientId);
     
+    // Try different connection settings for Railway's MQTT broker
     $connectionSettings = (new ConnectionSettings())
         ->setKeepAliveInterval(60)
-        ->setConnectTimeout(15)
-        ->setSocketTimeout(15)
-        ->setResendTimeout(10);
+        ->setConnectTimeout(30)
+        ->setSocketTimeout(30)
+        ->setResendTimeout(10)
+        ->setUseTls(false)           // Explicitly disable TLS
+        ->setTlsSelfSignedAllowed(false);
     
     if (!empty($username)) {
+        echo "   Setting username: '$username'\n";
+        echo "   Setting password: '" . substr($password, 0, 5) . "...'\n";
         $connectionSettings
             ->setUsername($username)
             ->setPassword($password);
     }
     
-    echo "   Attempting MQTT connection...\n";
-    $client->connect($connectionSettings, true);
-    echo "   ✅ MQTT connection successful!\n";
+    echo "   Connection settings configured\n";
+    
+    echo "   Attempting MQTT connection with clean session=true...\n";
+    try {
+        $client->connect($connectionSettings, true);
+        echo "   ✅ MQTT connection successful!\n";
+    } catch (Exception $e1) {
+        echo "   ❌ Clean session=true failed: " . $e1->getMessage() . "\n";
+        echo "   Trying with clean session=false...\n";
+        
+        // Try without clean session
+        $client = new MqttClient($host, $port, $clientId);
+        $client->connect($connectionSettings, false);
+        echo "   ✅ MQTT connection successful with clean session=false!\n";
+    }
     
     // Test 3: Subscribe to test topic
     echo "\n3. Testing topic subscription...\n";
