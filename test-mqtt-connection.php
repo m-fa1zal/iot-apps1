@@ -39,14 +39,18 @@ echo "\n2. Testing MQTT client connection...\n";
 try {
     $client = new MqttClient($host, $port, $clientId);
     
-    // Try different connection settings for Railway's MQTT broker
+    // Try TLS connection settings for Railway's MQTT broker
     $connectionSettings = (new ConnectionSettings())
         ->setKeepAliveInterval(60)
         ->setConnectTimeout(30)
         ->setSocketTimeout(30)
         ->setResendTimeout(10)
-        ->setUseTls(false)           // Explicitly disable TLS
-        ->setTlsSelfSignedAllowed(false);
+        ->setUseTls(true)                    // Enable TLS/SSL
+        ->setTlsSelfSignedAllowed(true)      // Allow self-signed certificates
+        ->setTlsVerifyPeer(false)            // Don't verify peer certificate
+        ->setTlsVerifyPeerName(false);       // Don't verify peer name
+    
+    echo "   TLS/SSL enabled with relaxed certificate verification\n";
     
     if (!empty($username)) {
         echo "   Setting username: '$username'\n";

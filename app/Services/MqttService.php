@@ -42,7 +42,11 @@ class MqttService
             ->setKeepAliveInterval(60)
             ->setConnectTimeout(30)
             ->setSocketTimeout(30)
-            ->setResendTimeout(10);
+            ->setResendTimeout(10)
+            ->setUseTls(true)                    // Enable TLS/SSL
+            ->setTlsSelfSignedAllowed(true)      // Allow self-signed certificates
+            ->setTlsVerifyPeer(false)            // Don't verify peer certificate
+            ->setTlsVerifyPeerName(false);       // Don't verify peer name
             
         if (!empty($this->mqtt_username)) {
             $this->connectionSettings
