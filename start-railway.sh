@@ -41,8 +41,21 @@ echo "[1/2] Starting Laravel Web Server..."
 php artisan serve --host=0.0.0.0 --port=${PORT:-8000} &
 WEB_PID=$!
 
+# Debug MQTT connection before starting listener
+echo "Debugging MQTT connection..."
+echo "Testing connection to MQTT broker..."
+
+# Test if we can reach the MQTT broker
+if command -v nc >/dev/null 2>&1; then
+    echo "Testing TCP connection to MQTT broker..."
+    timeout 10 nc -zv ${MQTT_HOST:-localhost} ${MQTT_PORT:-1883} || echo "❌ Cannot reach MQTT broker"
+else
+    echo "⚠️ netcat not available for connection testing"
+fi
+
 # 2. Start Laravel MQTT Listener (connects to Railway's MQTT broker)
 echo "[2/2] Starting Laravel MQTT Listener..."
+echo "MQTT Config: ${MQTT_HOST:-not_set}:${MQTT_PORT:-not_set}"
 php artisan mqtt:listen &
 LISTENER_PID=$!
 
